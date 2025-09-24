@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "convolution-bounds"
+version = "0.0.0"
+description = "Discrete convolution bounds on fixed grids: PMF rounding and Stieltjes envelopes (CDF/CCDF) with Numba."
+readme = "IMPLEMENTATION_GUIDE_NUMBA.md"
+requires-python = ">=3.10"
+authors = [{name = "Your Team"}]
+license = {text = "MIT"}
+dependencies = [
+  "numpy>=1.24",
+  "numba>=0.59"
+]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.8"]
+plot = ["matplotlib>=3.7"]
+test = ["pytest>=7.4", "pytest-cov>=4.1"]
+dev = ["black>=24.0", "ruff>=0.6.0", "mypy>=1.7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error", "ignore::DeprecationWarning:numba.*"]
+
+[tool.black]
+target-version = ["py310"]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+select = ["E","F","I","UP"]
+ignore = ["E501"]
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+strict_optional = true
+no_implicit_optional = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["implementation*"]
+exclude = ["tests*"]

@@ -1,0 +1,54 @@
+
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage[a4paper,margin=1in]{geometry}
+
+\title{Convolution Envelopes on Discrete Grids with $\pm\infty$ Mass}
+\author{}
+\date{}
+
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+
+\begin{document}
+\maketitle
+
+\paragraph{Setup.}
+Two independent random variables $X,Y$ are represented on strictly increasing grids
+with a finite grid mass and optional $p_{\pm\infty}$. We construct lower/upper envelopes
+for $Z=X+Y$ on an output grid $\mathbf{t}$.
+
+\paragraph{Stieltjes conventions and rounding.}
+For CDF envelopes: lower uses the right limit at $t_k$, upper uses the left limit at $t_{k+1}$.
+For CCDF, mirror the roles. Boundary clamps: CDF has $F_Y(q<x_0) = p^{(Y)}_{-\infty}$ and
+$F_Y(q\ge x_{K-1})=1-p^{(Y)}_{+\infty}$; CCDF clamps accordingly. PMF$\times$PMF rounding:
+DOMINATES uses ``right'' (exact hits up; $t_{K'-1}\to +\infty$), IS\_DOMINATED uses
+``left''$-1$ (exact hits down; $t_0\to -\infty$).
+
+\paragraph{Feasible intervals.}
+For any anchor $t$, $F_Z(t)\in[\,p^{(X)}_{-\infty},\,p^{(X)}_{-\infty}+m_X(1-p^{(Y)}_{+\infty})\,]$
+and $S_Z(t)\in[\,p^{(X)}_{+\infty},1\,]$.
+
+\paragraph{$\pm\infty$ ledger.}
+To $-\infty$: $X.p_{-\infty}(m_Y+Y.p_{-\infty})+Y.p_{-\infty}m_X$.
+To $+\infty$: $X.p_{+\infty}(m_Y+Y.p_{+\infty})+Y.p_{+\infty}m_X$.
+Ambiguous cross $m_{\times}=X.p_{-\infty}Y.p_{+\infty}+X.p_{+\infty}Y.p_{-\infty}$
+is routed to $+\infty$ for DOMINATES and to $-\infty$ for IS\_DOMINATED.
+
+\paragraph{Projection.}
+Clip to feasible intervals and project via running maximum (CDF) or reverse running minimum (CCDF).
+
+\paragraph{Self-convolution.}
+Exponentiation-by-squaring maintains $(\mathrm{cur\_pmf},\mathrm{acc})$ as described in the guide;
+identity $\delta_0$ is placed at $i_0=\max\{j:t_j\le 0\}$ (or $0$ if none).
+
+\paragraph{Grid Selection (Implementation Note).}
+Envelopes do not depend on a specific anchor set. The default ``trim--log'' strategy trims total mass
+$\beta$ (with $q=\sqrt{\beta/2}$ per side on each input CDF) and uses a logarithmic grid on
+$[x_{\mathrm{lo}}+y_{\mathrm{lo}},\,x_{\mathrm{hi}}+y_{\mathrm{hi}}]$. This assumes positive support
+and falls back to range-linear or exact Minkowski as needed. The envelope formulas above remain valid
+for any strictly increasing grid.
+
+\end{document}
