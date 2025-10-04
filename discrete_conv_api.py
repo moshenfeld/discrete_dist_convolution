@@ -31,7 +31,7 @@ def ccdf_to_pmf(x: np.ndarray, S: np.ndarray, p_neg_inf: float, p_pos_inf: float
             pmf[1:][pmf[1:] < 0.0] = 0.0
     return x, pmf, float(p_neg_inf), float(p_pos_inf)
 
-def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = 'DOMINATES', spacing: Spacing = Spacing.LINEAR) -> DiscreteDist:
+def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = 'DOMINATES', spacing: Spacing = Spacing.LINEAR, beta: float = 1e-12) -> DiscreteDist:
     """
     Convolve two PMFs.
     
@@ -43,6 +43,8 @@ def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = 'DOMI
         Tie-breaking mode (default: 'DOMINATES')
     spacing : Spacing
         Grid spacing strategy - LINEAR or GEOMETRIC (default: LINEAR)
+    beta : float
+        Probability mass threshold for grid generation
         
     Returns:
     --------
@@ -52,13 +54,13 @@ def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = 'DOMI
     Usage:
     ------
     # Automatic grid generation
-    Z = convolve_pmf_pmf_to_pmf(X, Y, mode='DOMINATES', spacing=Spacing.LINEAR)
+    Z = convolve_pmf_pmf_to_pmf(X, Y, mode='DOMINATES', spacing=Spacing.LINEAR, beta=1e-12)
     """
     if X.kind != DistKind.PMF or Y.kind != DistKind.PMF:
         raise ValueError('convolve_pmf_pmf_to_pmf expects PMF inputs')
     
     # Use automatic grid generation
-    result = _impl_kernels.convolve_pmf_pmf_to_pmf_core(X, Y, mode, spacing)
+    result = _impl_kernels.convolve_pmf_pmf_to_pmf_core(X, Y, mode, spacing, beta)
     result.name = 'pmf⊕pmf'
     return result
 
@@ -128,7 +130,7 @@ def convolve_pmf_ccdf_to_ccdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.n
     S, pneg, ppos = _impl_kernels.convolve_pmf_ccdf_to_ccdf_core(X, Y, t, mode)
     return DiscreteDist(x=t, kind=DistKind.CCDF, vals=S, p_neg_inf=pneg, p_pos_inf=ppos, name='pmf⊕ccdf')
 
-def self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode = 'DOMINATES', spacing: Spacing = Spacing.LINEAR) -> DiscreteDist:
+def self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode = 'DOMINATES', spacing: Spacing = Spacing.LINEAR, beta: float = 1e-12) -> DiscreteDist:
     """
     Self-convolve a PMF T times: compute X + X + ... + X (T times).
     
@@ -141,6 +143,7 @@ def self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode = 'DOMINATES', spac
     T: Number of times to convolve (must be >= 1)
     mode: Tie-breaking mode (default: 'DOMINATES')
     spacing: Grid spacing strategy - LINEAR or GEOMETRIC (default: LINEAR)
+    beta: Probability mass threshold for grid generation (default: 1e-12)
     
     Returns:
     --------
@@ -149,10 +152,10 @@ def self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode = 'DOMINATES', spac
     Usage:
     ------
     # With linear spacing (default)
-    Z = self_convolve_pmf(base, T=10, mode='DOMINATES')
+    Z = self_convolve_pmf(base, T=10, mode='DOMINATES', beta=1e-12)
     
     # With geometric spacing (for positive distributions)
-    Z = self_convolve_pmf(base, T=10, mode='DOMINATES', spacing=Spacing.GEOMETRIC)
+    Z = self_convolve_pmf(base, T=10, mode='DOMINATES', spacing=Spacing.GEOMETRIC, beta=1e-12)
     
     Note:
     -----
@@ -163,7 +166,7 @@ def self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode = 'DOMINATES', spac
     if T < 1:
         raise ValueError(f'T must be >= 1, got {T}')
     
-    result = _impl_selfconv.self_convolve_pmf_core(base, int(T), mode, spacing)
+    result = _impl_selfconv.self_convolve_pmf_core(base, int(T), mode, spacing, beta)
     result.name = f'{base.name or "X"}⊕^{T}'
     return result
 

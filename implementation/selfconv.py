@@ -3,7 +3,7 @@ import numpy as np
 from .kernels import convolve_pmf_pmf_to_pmf_core
 from .types import Mode, Spacing, DistKind, DiscreteDist
 
-def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spacing) -> DiscreteDist:
+def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spacing, beta: float) -> DiscreteDist:
     """
     Self-convolve a PMF T times using exponentiation-by-squaring with evolving grids.
     
@@ -20,6 +20,7 @@ def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spac
     T: Number of times to convolve (must be >= 1)
     mode: Tie-breaking mode
     spacing: Grid spacing strategy (LINEAR or GEOMETRIC)
+    beta: Probability mass threshold for grid generation
     
     Returns:
     --------
@@ -43,11 +44,11 @@ def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spac
                 acc_dist = base_dist
             else:
                 # Convolve acc with base_dist - grid computed automatically inside kernel
-                acc_dist = convolve_pmf_pmf_to_pmf_core(acc_dist, base_dist, mode, spacing)
+                acc_dist = convolve_pmf_pmf_to_pmf_core(acc_dist, base_dist, mode, spacing, beta)
         T >>= 1  # Shift right (divide by 2)
         if T > 0:
             # Square base_dist - grid computed automatically inside kernel
-            base_dist = convolve_pmf_pmf_to_pmf_core(base_dist, base_dist, mode, spacing)
+            base_dist = convolve_pmf_pmf_to_pmf_core(base_dist, base_dist, mode, spacing, beta)
     
     return acc_dist
 

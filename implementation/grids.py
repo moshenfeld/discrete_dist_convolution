@@ -131,9 +131,9 @@ def build_grid_from_support_bounds(dist_x, dist_y, spacing, beta):
 
 def discretize_continuous_to_pmf(dist: stats.rv_continuous,
                                   n_grid: int,
-                                  beta: float = 1e-6,
-                                  mode: Mode = Mode.DOMINATES,
-                                  spacing: Spacing = Spacing.LINEAR) -> Tuple[np.ndarray, np.ndarray, float, float]:
+                                  beta: float,
+                                  mode: Mode,
+                                  spacing: Spacing) -> Tuple[np.ndarray, np.ndarray, float, float]:
     """
     Discretize a continuous distribution onto a grid using quantile-based spacing.
     
@@ -144,7 +144,7 @@ def discretize_continuous_to_pmf(dist: stats.rv_continuous,
     n_grid : int
         Number of grid points
     beta : float
-        Tail probability to trim (default 1e-6)
+        Tail probability to trim
     mode : Mode
         Mode.DOMINATES for upper bound, Mode.IS_DOMINATED for lower bound
     spacing : Spacing
@@ -181,57 +181,24 @@ def discretize_continuous_to_pmf(dist: stats.rv_continuous,
     
     # Step 2: Create spacing based on spacing parameter
     if spacing == Spacing.GEOMETRIC:
-        # Geometric spacing
-        if q_min > 0:
-            # Positive support: use geomspace directly
+        if q_min <= 0:
+            raise ValueError(f"Cannot use geometric spacing when range [{q_min:.6f}, {q_max:.6f}] contains negative values.")
+        else:
             x = np.geomspace(q_min, q_max, n_grid, dtype=np.float64)
-        elif q_max < 0:
-            # Negative support: geomspace on absolute values, then negate and reverse
-            x = -np.geomspace(-q_max, -q_min, n_grid, dtype=np.float64)[::-1]
-        else:
-            # Support contains 0: cannot use geometric spacing
-            raise ValueError(f"Cannot use geometric spacing when range [{q_min:.6f}, {q_max:.6f}] contains 0. "
-                           f"Use spacing='linear' instead.")
     else:
-        # Linear spacing
         x = np.linspace(q_min, q_max, n_grid, dtype=np.float64)
-    
-    # Ensure strict ordering
-    x = np.ascontiguousarray(x, dtype=np.float64)
-    
+        
     # Step 3: Discretize to PMF using CDF
-    F = dist.cdf(x)
-    
+    # Step 4: Assign tail masses to ±∞ based on mode
     if mode == Mode.DOMINATES:
-        # Upper bound: CDF-based discretization
-        # pmf[i] = F(x[i+1]) - F(x[i])
-        pmf = np.zeros(n_grid, dtype=np.float64)
-        pmf[:-1] = np.diff(F)
-        pmf[-1] = 0.0  # Last bin gets no mass (goes to p_pos_inf)
+        F = dist.cdf(x)
+        pmf = np.concatenate(([F[0]], np.diff(F)))
+        p_neg_inf = 0.0
+        p_pos_inf = dist.sf(x[-1])
+    else:
+        F = dist.sf(x)
+        pmf = np.concatenate([-np.diff(F), [F[-1]]])
+        p_neg_inf = dist.cdf(x[0])
+        p_pos_inf = 0.0
         
-        p_neg_inf = F[0]
-        p_pos_inf = 1.0 - F[-1]
-        
-    else:  # IS_DOMINATED
-        # Lower bound: CCDF-based discretization
-        # pmf[i] = (1-F(x[i])) - (1-F(x[i+1])) = F(x[i+1]) - F(x[i])
-        # But first bin starts at x[0], not -∞
-        pmf = np.zeros(n_grid, dtype=np.float64)
-        pmf[0] = F[0]  # Mass from -∞ to x[0]
-        pmf[1:] = np.diff(F)
-        
-        p_neg_inf = 0.0  # Lower bound: no mass can go to -∞
-        p_pos_inf = 1.0 - F[-1]
-    
-    # Step 4: Budget correction
-    pmf = np.maximum(pmf, 0.0)  # Ensure non-negative
-    total = pmf.sum() + p_neg_inf + p_pos_inf
-    if abs(total - 1.0) > 1e-10:
-        # Correct the last bin
-        if pmf[-1] + (1.0 - total) >= 0:
-            pmf[-1] += (1.0 - total)
-        else:
-            # Distribute error across all bins
-            pmf *= (1.0 - p_neg_inf - p_pos_inf) / pmf.sum() if pmf.sum() > 0 else 0
-    
     return x, pmf, float(p_neg_inf), float(p_pos_inf)

@@ -5,51 +5,41 @@ from .types import Mode, Spacing, DistKind, DiscreteDist
 from .grids import build_grid_from_support_bounds
 
 @njit(cache=True)
-def _pmf_pmf_kernel_numba(xX: np.ndarray, pX: np.ndarray, 
-                          xY: np.ndarray, pY: np.ndarray,
-                          t: np.ndarray, mode_is_dominates: bool):
+def _pmf_pmf_kernel_numba(x1: np.ndarray, p1: np.ndarray, 
+                          x2: np.ndarray, p2: np.ndarray,
+                          x_out: np.ndarray, mode_is_dominates: bool):
     """
     Numba kernel for PMF×PMF convolution with proper tie-breaking.
     
     mode_is_dominates: True for DOMINATES mode, False for IS_DOMINATED mode
     Returns: (pmf_out, pneg_extra, ppos_extra)
     """
-    pmf_out = np.zeros(t.size, dtype=np.float64)
+    pmf_out = np.zeros(x_out.size, dtype=np.float64)
     pneg_extra = 0.0
     ppos_extra = 0.0
     
     # Double loop over all (i,j) pairs
-    for i in range(xX.size):
-        for j in range(xY.size):
-            z = xX[i] + xY[j]
-            mass = pX[i] * pY[j]
+    for i in range(x1.size):
+        for j in range(x2.size):
+            z = x1[i] + x2[j]
+            mass = p1[i] * p2[j]
             
             if mode_is_dominates:
-                # DOMINATES: exact hits go up, use 'right'
-                idx = np.searchsorted(t, z, side='right')
-                
-                if idx >= t.size:
-                    # z > t[-1] or z == t[-1], mass goes to +∞
+                idx = np.searchsorted(x_out, z, side='left')
+                if idx >= x_out.size:
                     ppos_extra += mass
                 else:
                     pmf_out[idx] += mass
             else:
-                # IS_DOMINATED: exact hits go down, use 'left' - 1
-                idx_raw = np.searchsorted(t, z, side='left')
-                idx = idx_raw - 1
-                
+                idx = np.searchsorted(x_out, z, side='right') - 1
                 if idx < 0:
-                    # z < t[0] or z == t[0], mass goes to -∞
                     pneg_extra += mass
-                elif idx_raw >= t.size:
-                    # z > t[-1], mass goes to +∞
-                    ppos_extra += mass
                 else:
                     pmf_out[idx] += mass
     
     return pmf_out, pneg_extra, ppos_extra
 
-def convolve_pmf_pmf_to_pmf_core(X: DiscreteDist, Y: DiscreteDist, mode: Mode, spacing: Spacing) -> DiscreteDist:
+def convolve_pmf_pmf_to_pmf_core(X: DiscreteDist, Y: DiscreteDist, mode: Mode, spacing: Spacing, beta: float) -> DiscreteDist:
     """
     PMF×PMF → PMF convolution with proper tie-breaking and infinity handling.
     
@@ -61,6 +51,7 @@ def convolve_pmf_pmf_to_pmf_core(X: DiscreteDist, Y: DiscreteDist, mode: Mode, s
     X, Y: DiscreteDist objects (must have kind='pmf')
     mode: "DOMINATES" (exact hits up) or "IS_DOMINATED" (exact hits down)
     spacing: Grid spacing strategy (LINEAR or GEOMETRIC)
+    beta: Probability mass threshold for grid generation
     
     Returns:
     --------
@@ -70,7 +61,7 @@ def convolve_pmf_pmf_to_pmf_core(X: DiscreteDist, Y: DiscreteDist, mode: Mode, s
         raise ValueError(f'convolve_pmf_pmf_to_pmf_core expects PMF inputs, got {X.kind}, {Y.kind}')
     
     # Generate output grid
-    t = build_grid_from_support_bounds(X, Y, spacing, beta=1e-6)
+    t = build_grid_from_support_bounds(X, Y, spacing, beta)
     
     # Compute finite-finite convolution with tie-breaking
     mode_is_dominates = (mode == "DOMINATES")
