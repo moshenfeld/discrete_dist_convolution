@@ -1,7 +1,7 @@
 
 # Numerical Convolution Package — Numba Implementation Guide
 
-**Note**: This guide describes the low-level implementation details. For API usage, see `../USAGE_NEW_GRID.md` and `../README.md`.
+**Note**: This guide describes the low-level implementation details. For API usage, see `../README.md`.
 
 **Current Status (Oct 2025)**: PMF×PMF kernel and self-convolution fully implemented with automatic grid generation. CDF/CCDF Stieltjes kernels are stub implementations.
 

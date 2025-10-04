@@ -3,8 +3,7 @@ import pytest
 
 # from discrete_conv_api import (
 #     DiscreteDist, convolve_pmf_pmf_to_pmf, convolve_pmf_cdf_to_cdf,
-#     convolve_pmf_ccdf_to_ccdf, step_cdf_left, step_cdf_right,
-#     step_ccdf_left, step_ccdf_right
+#     convolve_pmf_ccdf_to_ccdf
 # )
 
 TOL_MICRO = 1e-12

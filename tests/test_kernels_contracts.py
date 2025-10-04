@@ -1,11 +1,10 @@
 import numpy as np
 import pytest
 from implementation.kernels import (
-    _convolve_pmf_pmf_on_grid,
     convolve_pmf_cdf_to_cdf_core,
     convolve_pmf_ccdf_to_ccdf_core,
 )
-from discrete_conv_api import DiscreteDist, DistKind
+from discrete_conv_api import DiscreteDist, DistKind, convolve_pmf_pmf_to_pmf
 
 def test_pmf_cdf_core_ledger_only_until_implemented():
     # Minimal inputs where FY[-1]-pnegY = mY (finite mass); check ledger scalars.
@@ -23,16 +22,19 @@ def test_pmf_cdf_core_ledger_only_until_implemented():
     assert F.shape == t.shape
 
 def test_pmf_pmf_core_ledger_matches_when_no_edges():
-    # Choose t wide to avoid edge extra rounding paths; only ledger contributes for now.
+    # Choose wide spacing to avoid edge extra rounding paths; only ledger contributes for now.
     X = DiscreteDist(x=np.array([0.0, 1.0]), kind=DistKind.PMF, vals=np.array([0.2, 0.1]),
                      p_neg_inf=0.05, p_pos_inf=0.15)
     Y = DiscreteDist(x=np.array([0.0, 2.0]), kind=DistKind.PMF, vals=np.array([0.3, 0.2]),
                      p_neg_inf=0.0, p_pos_inf=0.35)
-    t = np.linspace(-100, 100, 11)  # very wide
-    pmf_out, pnegZ, pposZ = _convolve_pmf_pmf_on_grid(X, Y, t, "IS_DOMINATED")
-    # pmf_out currently zeros; assert shapes and nonnegativity of infinities
-    assert pmf_out.shape == t.shape
-    assert pnegZ >= 0 and pposZ >= 0
+    
+    # Use automatic grid generation instead of explicit grid
+    result = convolve_pmf_pmf_to_pmf(X, Y, mode="IS_DOMINATED")
+    
+    # Check that result is a valid DiscreteDist
+    assert isinstance(result, DiscreteDist)
+    assert result.kind == DistKind.PMF
+    assert result.p_neg_inf >= 0 and result.p_pos_inf >= 0
 
 @pytest.mark.xfail(reason="CCDF core kernel envelope not yet implemented")
 def test_pmf_ccdf_core_future_envelope_behavior():

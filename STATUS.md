@@ -68,7 +68,6 @@
   - Legacy `build_grid_trim_log_from_dists` for backwards compatibility
   
 - **Infinity ledger**: `implementation/ledger.py`
-- **Step evaluators**: `implementation/steps.py`
 - **Utility functions**: `implementation/utils.py`
 - **Test fixtures**: `tests/conftest.py`
 
@@ -130,14 +129,12 @@ Z = self_convolve_pmf(base, T, mode='DOMINATES', spacing=Spacing.LINEAR)
 ### Core Implementation (`implementation/`):
 - `kernels.py` - Convolution kernels (PMF×PMF)
   - `convolve_pmf_pmf_to_pmf_core(X, Y, mode, spacing)` → `DiscreteDist`
-  - `_convolve_pmf_pmf_on_grid(X, Y, t, mode)` → tuple (legacy)
 - `selfconv.py` - Self-convolution
   - `self_convolve_pmf_core(base, T, mode, spacing)` → `DiscreteDist`
 - `grids.py` - Grid generation
   - `build_grid_from_support_bounds(xX, xY, spacing)` → grid array
   - `discretize_continuous_to_pmf(dist, n_grid, beta, mode, spacing)` → tuple
 - `ledger.py` - Infinity mass accounting
-- `steps.py` - CDF/CCDF step evaluators
 - `utils.py` - Helper functions
 
 ### API Layer (`discrete_conv_api.py`):
@@ -150,7 +147,6 @@ Z = self_convolve_pmf(base, T, mode='DOMINATES', spacing=Spacing.LINEAR)
 - `test_selfconv_core.py` - Self-convolution tests
 - `test_kernels_contracts.py` - Contract validation
 - `test_ledger.py` - Infinity ledger tests
-- `test_steps.py` - Step evaluator tests
 - `test_utils.py` - Utility function tests
 - Additional property tests
 
@@ -163,7 +159,7 @@ Z = self_convolve_pmf(base, T, mode='DOMINATES', spacing=Spacing.LINEAR)
 
 ### Documentation (`docs/` and root):
 - `README.md` - Main documentation with quickstart ✅
-- `USAGE_NEW_GRID.md` - Comprehensive API guide ✅
+- `README.md` - Comprehensive API guide ✅
 - `STATUS.md` - This file ✅
 - `docs/IMPLEMENTATION_GUIDE_NUMBA.md` - Implementation details
 - `docs/DERIVATION.tex` - Mathematical derivations

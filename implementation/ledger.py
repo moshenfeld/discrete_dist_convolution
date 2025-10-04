@@ -44,7 +44,14 @@ def infinity_ledger_from_pmfs(X: "DiscreteDist", Y: "DiscreteDist", mode: Mode) 
     add_neg = pnegX * (mY + pnegY) + pnegY * mX
     add_pos = pposX * (mY + pposY) + pposY * mX
     m_cross = pnegX * pposY + pposX * pnegY
-    if mode == Mode.DOMINATES:
+    
+    # Handle both string and enum modes
+    if isinstance(mode, str):
+        mode_str = mode
+    else:
+        mode_str = mode.value
+    
+    if mode_str == "DOMINATES":
         add_pos += m_cross
     else:
         add_neg += m_cross

@@ -1,13 +1,8 @@
-from typing import TYPE_CHECKING, Optional
 import numpy as np
 from numba import njit
 from .ledger import infinity_ledger_from_pmfs
-from .steps import step_cdf_right, step_cdf_left, step_ccdf_right, step_ccdf_left
-# Removed unused imports
-from .types import Mode, Spacing, DistKind
-
-if TYPE_CHECKING:
-    from .types import DiscreteDist
+from .types import Mode, Spacing, DistKind, DiscreteDist
+from .grids import build_grid_from_support_bounds
 
 @njit(cache=True)
 def _pmf_pmf_kernel_numba(xX: np.ndarray, pX: np.ndarray, 
@@ -54,7 +49,7 @@ def _pmf_pmf_kernel_numba(xX: np.ndarray, pX: np.ndarray,
     
     return pmf_out, pneg_extra, ppos_extra
 
-def convolve_pmf_pmf_to_pmf_core(X: "DiscreteDist", Y: "DiscreteDist", mode: Mode, spacing: "Spacing") -> "DiscreteDist":
+def convolve_pmf_pmf_to_pmf_core(X: DiscreteDist, Y: DiscreteDist, mode: Mode, spacing: Spacing) -> DiscreteDist:
     """
     PMF×PMF → PMF convolution with proper tie-breaking and infinity handling.
     
@@ -74,10 +69,6 @@ def convolve_pmf_pmf_to_pmf_core(X: "DiscreteDist", Y: "DiscreteDist", mode: Mod
     if X.kind != DistKind.PMF or Y.kind != DistKind.PMF:
         raise ValueError(f'convolve_pmf_pmf_to_pmf_core expects PMF inputs, got {X.kind}, {Y.kind}')
     
-    # Import here to avoid circular dependency
-    from discrete_conv_api import DiscreteDist
-    from .grids import build_grid_from_support_bounds
-    
     # Generate output grid
     t = build_grid_from_support_bounds(X, Y, spacing, beta=1e-6)
     
@@ -95,40 +86,7 @@ def convolve_pmf_pmf_to_pmf_core(X: "DiscreteDist", Y: "DiscreteDist", mode: Mod
     
     return DiscreteDist(x=t, kind=DistKind.PMF, vals=pmf_out, p_neg_inf=pnegZ, p_pos_inf=pposZ)
 
-def _convolve_pmf_pmf_on_grid(X: "DiscreteDist", Y: "DiscreteDist", t: np.ndarray, mode: Mode):
-    """
-    PMF×PMF → PMF core with explicit grid (legacy interface).
-    
-    Parameters:
-    -----------
-    X, Y: DiscreteDist objects (must have kind='pmf')
-    t: Output grid
-    mode: "DOMINATES" (exact hits up) or "IS_DOMINATED" (exact hits down)
-    
-    Returns:
-    --------
-    pmf_out: PMF on grid t
-    pnegZ: Total mass at -∞
-    pposZ: Total mass at +∞
-    """
-    if X.kind != DistKind.PMF or Y.kind != DistKind.PMF:
-        raise ValueError(f'convolve_pmf_pmf_to_pmf_core expects PMF inputs, got {X.kind}, {Y.kind}')
-    
-    # Compute finite-finite convolution with tie-breaking
-    mode_is_dominates = (mode == "DOMINATES")
-    pmf_out, pneg_extra, ppos_extra = _pmf_pmf_kernel_numba(
-        X.x, X.vals, Y.x, Y.vals, t, mode_is_dominates
-    )
-    
-    # Add infinity ledger contributions
-    add_neg, add_pos = infinity_ledger_from_pmfs(X, Y, mode)
-    
-    pnegZ = pneg_extra + add_neg
-    pposZ = ppos_extra + add_pos
-    
-    return pmf_out, pnegZ, pposZ
-
-def convolve_pmf_cdf_to_cdf_core(X: "DiscreteDist", Y: "DiscreteDist", t: np.ndarray, mode: Mode):
+def convolve_pmf_cdf_to_cdf_core(X: DiscreteDist, Y: DiscreteDist, t: np.ndarray, mode: Mode):
     """
     PMF×CDF → CDF envelope core (pseudocode in docstring). Returns (F, pnegZ_add, pposZ_add).
     """
@@ -139,7 +97,7 @@ def convolve_pmf_cdf_to_cdf_core(X: "DiscreteDist", Y: "DiscreteDist", t: np.nda
     add_neg, add_pos = infinity_ledger_from_pmfs(X, Y, mode)
     return F, add_neg, add_pos
 
-def convolve_pmf_ccdf_to_ccdf_core(X: "DiscreteDist", Y: "DiscreteDist", t: np.ndarray, mode: Mode):
+def convolve_pmf_ccdf_to_ccdf_core(X: DiscreteDist, Y: DiscreteDist, t: np.ndarray, mode: Mode):
     """
     PMF×CCDF → CCDF envelope core (pseudocode in docstring). Returns (S, pnegZ_add, pposZ_add).
     """

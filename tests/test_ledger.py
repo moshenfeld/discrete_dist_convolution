@@ -8,10 +8,10 @@ def test_ledger_no_ambiguous_cross():
     # add_neg = pnegX*(mY+pnegY)+pnegY*mX = 0.1*(0.7+0.2)+0.2*0.6 = 0.09+0.12=0.21
     # add_pos = pposX*(mY+pposY)+pposY*mX = 0
     
-    # Create distributions with correct masses
-    X = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mX]), 
+    # Create distributions with correct masses (need at least 2 points for grid generation)
+    X = DiscreteDist(x=np.array([0.0, 0.1]), kind=DistKind.PMF, vals=np.array([mX, 0.0]), 
                      p_neg_inf=pnegX, p_pos_inf=pposX)
-    Y = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mY]), 
+    Y = DiscreteDist(x=np.array([0.0, 0.1]), kind=DistKind.PMF, vals=np.array([mY, 0.0]), 
                      p_neg_inf=pnegY, p_pos_inf=pposY)
     
     for mode in ("DOMINATES","IS_DOMINATED"):
@@ -27,10 +27,10 @@ def test_ledger_with_ambiguous_cross_routing():
     # add_pos_base = pposX*(mY+pposY)+pposY*mX = 0 + 0.4*0.5 = 0.2
     # ambiguous cross m_cross = pnegX*pposY + pposX*pnegY = 0.3*0.4 + 0 = 0.12
     
-    # Create distributions
-    X = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mX]), 
+    # Create distributions (need at least 2 points for grid generation)
+    X = DiscreteDist(x=np.array([0.0, 0.1]), kind=DistKind.PMF, vals=np.array([mX, 0.0]), 
                      p_neg_inf=pnegX, p_pos_inf=pposX)
-    Y = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mY]), 
+    Y = DiscreteDist(x=np.array([0.0, 0.1]), kind=DistKind.PMF, vals=np.array([mY, 0.0]), 
                      p_neg_inf=pnegY, p_pos_inf=pposY)
     
     add_neg, add_pos = infinity_ledger_from_pmfs(X, Y, "DOMINATES")

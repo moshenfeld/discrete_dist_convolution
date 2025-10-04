@@ -37,7 +37,6 @@ class DiscreteDist:
     p_pos_inf: float = 0.0
     name: Optional[str] = None
     debug_check: bool = False
-    tol: float = 1e-12
     
     def __post_init__(self):
         self.x = np.ascontiguousarray(self.x, dtype=np.float64)
@@ -46,7 +45,7 @@ class DiscreteDist:
             raise ValueError("x and vals must be 1-D arrays of equal length")
         if not np.all(np.diff(self.x) > 0):
             raise ValueError("x must be strictly increasing")
-        if self.p_neg_inf < -self.tol or self.p_pos_inf < -self.tol:
+        if self.p_neg_inf < 0 or self.p_pos_inf < 0:
             raise ValueError("p_neg_inf and p_pos_inf must be nonnegative")
         if self.debug_check:
             if self.kind == DistKind.PMF:

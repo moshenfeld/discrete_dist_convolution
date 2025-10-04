@@ -95,7 +95,7 @@ print(f"Result: {len(Z_self.x)} bins, E[Z] = {(Z_self.x * Z_self.vals).sum():.4f
 
 ## Documentation
 
-- `USAGE_NEW_GRID.md` - Grid generation and API guide
+- `README.md` - Grid generation and API guide
 - `docs/IMPLEMENTATION_GUIDE_NUMBA.md` - Implementation details and algorithms
 - `docs/DERIVATION.tex` - Mathematical derivations
 - `STATUS.md` - Current implementation status
