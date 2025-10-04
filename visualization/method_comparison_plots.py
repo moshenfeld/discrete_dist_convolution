@@ -125,12 +125,6 @@ def plot_gaussian_results(results: Dict[int, Dict[str, Any]], T_values: List[int
         ax_ccdf.fill_between(x_upper, ccdf_lower, ccdf_upper, 
                             alpha=0.1, color='C0')
         
-        # Add vertical line at theoretical expectation
-        E_theoretical = r['E_theoretical']
-        ax_cdf.axvline(E_theoretical, color='red', linestyle='--', 
-                      alpha=0.5, linewidth=2, label=f'E[theory]={E_theoretical:.1f}')
-        ax_ccdf.axvline(E_theoretical, color='red', linestyle='--', 
-                      alpha=0.5, linewidth=2, label=f'E[theory]={E_theoretical:.1f}')
         
         # Set x-axis range based on main bounds
         ax_cdf.set_xlim(x_min, x_max)
@@ -251,28 +245,25 @@ def plot_lognormal_results(results: Dict[int, Dict[str, Any]], T_values: List[in
         ax_ccdf.fill_between(x_upper, ccdf_lower, ccdf_upper, 
                             alpha=0.1, color='C0')
         
-        # Add vertical line at theoretical expectation
-        E_theoretical = r['E_theoretical']
-        ax_cdf.axvline(E_theoretical, color='red', linestyle='--', 
-                      alpha=0.5, linewidth=2, label=f'E[theory]={E_theoretical:.1f}')
-        ax_ccdf.axvline(E_theoretical, color='red', linestyle='--', 
-                      alpha=0.5, linewidth=2, label=f'E[theory]={E_theoretical:.1f}')
         
-        # Set x-axis range based on main bounds
-        ax_cdf.set_xlim(x_min, x_max)
-        ax_ccdf.set_xlim(x_min, x_max)
+        # Calculate expectation for focused visualization
+        E_theoretical = r['E_theoretical']
+        
+        # Set focused x-axis ranges: CDF from min to expectation, CCDF from expectation to max
+        ax_cdf.set_xlim(x_min, E_theoretical)
+        ax_ccdf.set_xlim(E_theoretical, x_max)
         
         # Labels and titles
         ax_cdf.set_xlabel('x')
         ax_cdf.set_ylabel('CDF')
-        ax_cdf.set_title(f'T={T} - CDF\nBias={r["bias_main"]:.3f}')
+        ax_cdf.set_title(f'T={T} - CDF (min to E[X])\nBias={r["bias_main"]:.3f}')
         ax_cdf.legend(fontsize=8, loc='best')
         ax_cdf.grid(True, alpha=0.3)
         ax_cdf.set_yscale('log')
         
         ax_ccdf.set_xlabel('x')
         ax_ccdf.set_ylabel('CCDF')
-        ax_ccdf.set_title(f'T={T} - CCDF\nBias={r["bias_main"]:.3f}')
+        ax_ccdf.set_title(f'T={T} - CCDF (E[X] to max)\nBias={r["bias_main"]:.3f}')
         ax_ccdf.legend(fontsize=8, loc='best')
         ax_ccdf.grid(True, alpha=0.3)
         ax_ccdf.set_yscale('log')

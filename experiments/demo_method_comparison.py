@@ -180,7 +180,7 @@ def run_lognormal_comparison(T_values):
     print(f"{'='*80}")
     
     # Create base LogNormal distribution
-    dist_lognorm = stats.lognorm(s=1.0, scale=np.exp(0))  # σ=1, μ=0
+    dist_lognorm = stats.lognorm(s=1, scale=1)
     
     # Discretize base distribution using main implementation
     try:

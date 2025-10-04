@@ -34,10 +34,10 @@ def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spac
     if T == 1:
         return base
     
+    beta /= T*np.log2(T) * 2
     # Binary exponentiation with evolving grids
     base_dist = base
     acc_dist = None
-    
     while T > 0:
         if T & 1:  # If bit is set
             if acc_dist is None:
@@ -49,6 +49,5 @@ def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spac
         if T > 0:
             # Square base_dist - grid computed automatically inside kernel
             base_dist = convolve_pmf_pmf_to_pmf_core(base_dist, base_dist, mode, spacing, beta)
-    
     return acc_dist
 
