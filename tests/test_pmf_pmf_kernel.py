@@ -1,7 +1,7 @@
 """Tests for PMF×PMF kernel implementation."""
 import numpy as np
 import pytest
-from implementations.kernels import convolve_pmf_pmf_to_pmf_core
+from implementation.kernels import convolve_pmf_pmf_to_pmf_core
 
 def test_pmf_pmf_simple_no_infinity():
     """Test basic PMF×PMF convolution without infinity masses."""

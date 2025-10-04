@@ -96,6 +96,33 @@ def convolve_pmf_ccdf_to_ccdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.n
     S, pneg, ppos = _impl_kernels.convolve_pmf_ccdf_to_ccdf_core(X.x, X.vals, X.p_neg_inf, X.p_pos_inf, Y.x, Y.vals, Y.p_neg_inf, Y.p_pos_inf, t, mode)
     return DiscreteDist(x=t, kind='ccdf', vals=S, p_neg_inf=pneg, p_pos_inf=ppos, name='pmf⊕ccdf')
 
+def self_convolve_pmf(base: DiscreteDist, T: int, t: Optional[np.ndarray] = None, mode: Mode = 'DOMINATES') -> DiscreteDist:
+    """
+    Self-convolve a PMF T times: compute X + X + ... + X (T times).
+    
+    Uses exponentiation-by-squaring for efficiency: O(log T) convolutions instead of O(T).
+    
+    Parameters:
+    -----------
+    base: Base distribution (must be PMF)
+    T: Number of times to convolve (must be >= 1)
+    t: Output grid (auto-generated if None)
+    mode: Tie-breaking mode
+    
+    Returns:
+    --------
+    Result distribution as PMF on grid t
+    """
+    if base.kind != 'pmf':
+        raise ValueError('self_convolve_pmf expects base as PMF')
+    if T < 1:
+        raise ValueError(f'T must be >= 1, got {T}')
+    if t is None:
+        t = _impl_grids.build_grid_self_convolution(base.x, int(T))
+    t = np.ascontiguousarray(t, dtype=np.float64)
+    pmf_out, pneg, ppos = _impl_selfconv.self_convolve_pmf_core(base.x, base.vals, base.p_neg_inf, base.p_pos_inf, int(T), t, mode)
+    return DiscreteDist(x=t, kind='pmf', vals=pmf_out, p_neg_inf=pneg, p_pos_inf=ppos, name=f'{base.name or "X"}⊕^{T}')
+
 def self_convolve_envelope(base: DiscreteDist, T: int, t: Optional[np.ndarray] = None, mode: Mode = 'DOMINATES', backend: Literal["cdf","ccdf"] = 'cdf') -> DiscreteDist:
     if base.kind != 'pmf':
         raise ValueError('self_convolve_envelope currently expects base as PMF')

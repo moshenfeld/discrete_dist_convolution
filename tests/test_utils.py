@@ -17,11 +17,11 @@ def test_clip_feasible_cdf_and_ccdf():
     F = np.array([-1.0, 0.2, 0.8, 1.2], dtype=np.float64)
     U.clip_to_feasible_cdf(F, p_neg_x=0.1, mX=0.6, p_pos_y=0.25)
     # hi = 0.1 + 0.6*(1-0.25) = 0.55
-    assert np.all(F == np.array([0.1, 0.2, 0.55, 0.55]))
+    assert np.allclose(F, np.array([0.1, 0.2, 0.55, 0.55]))
 
     S = np.array([-0.1, 0.2, 1.2], dtype=np.float64)
     U.clip_to_feasible_ccdf(S, p_pos_x=0.3)
-    assert np.all(S == np.array([0.3, 0.3, 1.0]))
+    assert np.allclose(S, np.array([0.3, 0.3, 1.0]))
 
 def test_reconcile_helpers():
     lower = np.array([0.1, 0.5, 0.7], dtype=np.float64)

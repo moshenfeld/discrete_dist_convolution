@@ -15,7 +15,7 @@ pip install -e ".[dev,viz,test]"
 # Run tests
 pytest -q
 
-# Optional: run comparison experiments (figures saved under ./_bounds_runs)
+# Optional: run comparison experiments (figures saved under ./plots)
 python experiments/run_comparisons.py
 ```
 
