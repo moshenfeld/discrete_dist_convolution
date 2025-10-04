@@ -10,7 +10,7 @@ sys.path.insert(0, str(project_root))
 
 import numpy as np
 import matplotlib.pyplot as plt
-from discrete_conv_api import DiscreteDist, self_convolve_pmf
+from discrete_conv_api import DiscreteDist, self_convolve_pmf, Spacing
 
 def create_gaussian_pmf(n: int, mu: float = 0.0, sigma: float = 1.0) -> DiscreteDist:
     """Create a discrete Gaussian PMF."""
@@ -46,9 +46,8 @@ def plot_self_convolutions(n_bins: int, T_values: list, save_path: str):
     for idx, (T, color) in enumerate(zip(T_values, colors)):
         print(f"  Computing T={T}...")
         
-        # Create output grid
-        t = np.linspace(T * (-5), T * 5, n_bins, dtype=np.float64)
-        Z = self_convolve_pmf(base, T, t=t, mode='DOMINATES')
+        # Compute with automatic grid generation
+        Z = self_convolve_pmf(base, T, mode='DOMINATES', spacing=Spacing.LINEAR)
         
         row = 0 if idx == 0 else 1
         col = 1 if idx == 0 else idx - 1

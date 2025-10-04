@@ -1,8 +1,47 @@
 
-from typing import Tuple, Literal
+from typing import Tuple, Literal, TYPE_CHECKING
+import numpy as np
+
+if TYPE_CHECKING:
+    from discrete_conv_api import DiscreteDist
+
 Mode = Literal["DOMINATES", "IS_DOMINATED"]
 
-def infinity_ledger_from_pmfs(mX: float, pnegX: float, pposX: float, mY: float, pnegY: float, pposY: float, mode: Mode) -> Tuple[float, float]:
+def infinity_ledger_from_pmfs(X: "DiscreteDist", Y: "DiscreteDist", mode: Mode) -> Tuple[float, float]:
+    """
+    Compute infinity ledger contributions for convolution.
+    
+    Parameters:
+    -----------
+    X: DiscreteDist object (must have kind='pmf')
+    Y: DiscreteDist object (can be 'pmf', 'cdf', or 'ccdf')
+    mode: "DOMINATES" or "IS_DOMINATED"
+    
+    Returns:
+    --------
+    (add_neg, add_pos): Additional mass at -∞ and +∞
+    """
+    if X.kind != 'pmf':
+        raise ValueError(f"infinity_ledger expects X to be PMF, got {X.kind}")
+    
+    mX = float(X.vals.sum())
+    pnegX = float(X.p_neg_inf)
+    pposX = float(X.p_pos_inf)
+    pnegY = float(Y.p_neg_inf)
+    pposY = float(Y.p_pos_inf)
+    
+    # Compute finite mass in Y based on its kind
+    if Y.kind == 'pmf':
+        mY = float(Y.vals.sum())
+    elif Y.kind == 'cdf':
+        # For CDF, finite mass is F[-1] - p_neg_inf
+        mY = float(Y.vals[-1] - pnegY) if len(Y.vals) > 0 else 0.0
+    elif Y.kind == 'ccdf':
+        # For CCDF, finite mass is (1 - S[0]) - p_neg_inf
+        mY = float(1.0 - Y.vals[0] - pnegY) if len(Y.vals) > 0 else 0.0
+    else:
+        raise ValueError(f"Unknown kind for Y: {Y.kind}")
+    
     add_neg = pnegX * (mY + pnegY) + pnegY * mX
     add_pos = pposX * (mY + pposY) + pposY * mX
     m_cross = pnegX * pposY + pposX * pnegY

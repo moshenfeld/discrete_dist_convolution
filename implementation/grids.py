@@ -1,6 +1,32 @@
 
-from typing import Sequence, Tuple, Optional, Literal
+from typing import Sequence, Tuple, Optional, Literal, Protocol, Union, Callable
+from enum import Enum
 import numpy as np
+from scipy import stats
+
+class Mode(Enum):
+    """Tie-breaking mode for discretization."""
+    DOMINATES = "DOMINATES"  # Upper bound (exact hits round up)
+    IS_DOMINATED = "IS_DOMINATED"  # Lower bound (exact hits round down)
+
+class Spacing(Enum):
+    """Grid spacing strategy."""
+    LINEAR = "linear"  # Linear spacing (linspace)
+    GEOMETRIC = "geometric"  # Geometric spacing (geomspace)
+
+class ContinuousDist(Protocol):
+    """Protocol for continuous distributions."""
+    def cdf(self, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """Cumulative distribution function."""
+        ...
+    
+    def ppf(self, q: float) -> float:
+        """Percent point function (quantile/inverse CDF)."""
+        ...
+    
+    def sf(self, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """Survival function (1 - CDF), also called CCDF."""
+        ...
 
 def _strict_f64(x: np.ndarray) -> np.ndarray:
     x = np.ascontiguousarray(x, dtype=np.float64)
@@ -8,21 +34,6 @@ def _strict_f64(x: np.ndarray) -> np.ndarray:
         x = x.ravel()
     return x
 
-def _decimate_uniform(t: np.ndarray, max_points: int) -> np.ndarray:
-    if max_points is None or t.size <= max_points:
-        return t
-    idx = np.linspace(0, t.size - 1, max_points, dtype=int)
-    return t[idx]
-
-def minkowski_sum_unique(x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    x = _strict_f64(x); y = _strict_f64(y)
-    sums = np.add.outer(x, y).ravel()
-    t = np.unique(sums)
-    return np.ascontiguousarray(t, dtype=np.float64)
-
-def support_bounds(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
-    x = _strict_f64(x); y = _strict_f64(y)
-    return float(x[0] + y[0]), float(x[-1] + y[-1])
 
 def right_quantile_from_cdf_grid(x: np.ndarray, F: np.ndarray, q: float) -> float:
     x = _strict_f64(x); F = _strict_f64(F)
@@ -48,88 +59,203 @@ def _cdf_array_from_dist_like(kind: str, x: np.ndarray, vals: np.ndarray, p_neg:
         raise ValueError(f"Unknown kind: {kind}")
     return np.ascontiguousarray(F, dtype=np.float64)
 
-def build_grid_trim_log_from_cdfs(xX: np.ndarray, FX: np.ndarray, xY: np.ndarray, FY: np.ndarray, *, beta: float = 1e-6, z_size: int | None = None, fallback: Literal["range-linear","minkowski"] = "range-linear") -> np.ndarray:
-    xX = _strict_f64(xX); FX = _strict_f64(FX)
-    xY = _strict_f64(xY); FY = _strict_f64(FY)
-    if z_size is None:
-        z_size = max(xX.size, xY.size)
-    z_size = max(int(z_size), 2)
 
-    q = float(np.sqrt(beta / 2.0))
-    x_lo = right_quantile_from_cdf_grid(xX, FX, q)
-    y_lo = right_quantile_from_cdf_grid(xY, FY, q)
-    x_hi = right_quantile_from_cdf_grid(xX, FX, 1.0 - q)
-    y_hi = right_quantile_from_cdf_grid(xY, FY, 1.0 - q)
-
-    z_min = x_lo + y_lo
-    z_max = x_hi + y_hi
-
-    if (not np.isfinite(z_min)) or (not np.isfinite(z_max)) or z_min <= 0.0 or z_max <= 0.0 or z_max <= z_min:
-        if fallback == "range-linear":
-            lo, hi = support_bounds(xX, xY)
-            lo = min(lo, z_min) if np.isfinite(z_min) else lo
-            hi = max(hi, z_max) if np.isfinite(z_max) else hi
-            t = np.linspace(lo, hi, z_size, dtype=np.float64)
-            if t.size > 1:
-                t[1:] += np.linspace(1e-12, 1e-9, t.size-1)
-            return np.ascontiguousarray(t, dtype=np.float64)
+def build_grid_from_support_bounds(dist_x, dist_y, spacing, beta):
+    """
+    Build grid for convolution using support bounds based on probability mass thresholds.
+    
+    Given two distributions dist_x, dist_y, spacing type, and beta:
+    1. Ensure dist_x size = dist_y size
+    2. Compute x_min, x_max using beta (probability mass thresholds)
+    3. Compute y_min, y_max using beta (probability mass thresholds)
+    4. Compute z_min = x_min + y_min, z_max = x_max + y_max
+    5. Compute new grid of same size as input distributions, linearly/geometrically spaced between z_min and z_max
+    
+    Parameters:
+    -----------
+    dist_x, dist_y : DiscreteDist objects
+        Input distributions
+    spacing : Spacing
+        Spacing.LINEAR for linear spacing, Spacing.GEOMETRIC for geometric spacing
+    beta : float
+        Parameter controlling grid range based on probability mass thresholds
+        
+    Returns:
+    --------
+    t : np.ndarray
+        Output grid for convolution result
+    """
+    xX = _strict_f64(dist_x.x)
+    xY = _strict_f64(dist_y.x)
+    pX = _strict_f64(dist_x.vals)
+    pY = _strict_f64(dist_y.vals)
+    
+    # Determine output grid size (same as inputs, take max if they differ)
+    z_size = max(xX.size, xY.size)
+    if z_size < 2:
+        raise ValueError(f"Grid size must be >= 2, got {z_size}")
+    
+    # Compute probability mass threshold
+    threshold = np.sqrt(beta/2)
+    
+    # Find x_min and x_max using beta
+    where_pX = np.where(np.cumsum(pX) <= threshold)[0]
+    iXmin = where_pX[-1] if len(where_pX) > 0 else 0
+    
+    where_pX_rev = np.where(np.cumsum(pX[::-1]) <= threshold)[0]
+    iXmax = np.size(pX) - 1 - (where_pX_rev[-1] if len(where_pX_rev) > 0 else 0)
+    
+    x_min = xX[iXmin]
+    x_max = xX[iXmax]
+    
+    # Find y_min and y_max using beta
+    where_pY = np.where(np.cumsum(pY) <= threshold)[0]
+    iYmin = where_pY[-1] if len(where_pY) > 0 else 0
+    
+    where_pY_rev = np.where(np.cumsum(pY[::-1]) <= threshold)[0]
+    iYmax = np.size(pY) - 1 - (where_pY_rev[-1] if len(where_pY_rev) > 0 else 0)
+    
+    y_min = xY[iYmin]
+    y_max = xY[iYmax]
+    
+    # Compute support bounds
+    z_min = x_min + y_min
+    z_max = x_max + y_max
+    
+    if not np.isfinite(z_min) or not np.isfinite(z_max):
+        raise ValueError(f"Support bounds not finite: z_min={z_min}, z_max={z_max}")
+    
+    if z_max <= z_min:
+        raise ValueError(f"Invalid support bounds: z_min={z_min} >= z_max={z_max}")
+    
+    # Create grid based on spacing type
+    if spacing == Spacing.GEOMETRIC:
+        # Geometric spacing
+        if z_min > 0:
+            # Positive support: use geomspace directly
+            t = np.geomspace(z_min, z_max, z_size, dtype=np.float64)
+        elif z_max < 0:
+            # Negative support: geomspace on absolute values, then negate and reverse
+            t = -np.geomspace(-z_max, -z_min, z_size, dtype=np.float64)[::-1]
         else:
-            t = minkowski_sum_unique(xX, xY)
-            return _decimate_uniform(t, z_size)
-
-    t = np.geomspace(z_min, z_max, z_size, dtype=np.float64)
+            # Support contains 0: cannot use geometric spacing
+            raise ValueError(
+                f"Cannot use geometric spacing when range [{z_min:.6f}, {z_max:.6f}] contains 0. "
+                f"Use spacing=Spacing.LINEAR instead."
+            )
+    else:
+        # Linear spacing
+        t = np.linspace(z_min, z_max, z_size, dtype=np.float64)
+    
+    # Add small perturbation to avoid exact collisions (except first point)
     if t.size > 1:
         t[1:] += np.linspace(1e-12, 1e-9, t.size-1)
+    
     return np.ascontiguousarray(t, dtype=np.float64)
 
-def build_grid_trim_log_from_dists(X, Y, *, beta: float = 1e-6, z_size: int | None = None, fallback: Literal["range-linear","minkowski"] = "range-linear") -> np.ndarray:
-    FX = _cdf_array_from_dist_like(X.kind, X.x, X.vals, X.p_neg_inf, X.p_pos_inf)
-    FY = _cdf_array_from_dist_like(Y.kind, Y.x, Y.vals, Y.p_neg_inf, Y.p_pos_inf)
-    return build_grid_trim_log_from_cdfs(X.x, FX, Y.x, FY, beta=beta, z_size=z_size, fallback=fallback)
-
-def build_grid_pmf_pmf(xX: np.ndarray, xY: np.ndarray, *, max_points: Optional[int] = None, strategy: Literal["trim-log","minkowski","range-linear"] = "trim-log", beta: float = 1e-6) -> np.ndarray:
-    if strategy == "trim-log":
-        # Without full CDFs here; fallback to exact Minkowski then decimate
-        t = minkowski_sum_unique(xX, xY)
-        t = _decimate_uniform(t, max_points if max_points is not None else t.size)
-        return t
-    if strategy == "minkowski":
-        t = minkowski_sum_unique(xX, xY)
-        t = _decimate_uniform(t, max_points if max_points is not None else t.size)
-        return t
+def discretize_continuous_to_pmf(dist: ContinuousDist,
+                                  n_grid: int,
+                                  beta: float = 1e-6,
+                                  mode: Mode = Mode.DOMINATES,
+                                  spacing: Spacing = Spacing.LINEAR) -> Tuple[np.ndarray, np.ndarray, float, float]:
+    """
+    Discretize a continuous distribution onto a grid using quantile-based spacing.
+    
+    Parameters:
+    -----------
+    dist : ContinuousDist
+        Continuous distribution object with cdf(), ppf(), and sf() methods
+    n_grid : int
+        Number of grid points
+    beta : float
+        Tail probability to trim (default 1e-6)
+    mode : Mode
+        Mode.DOMINATES for upper bound, Mode.IS_DOMINATED for lower bound
+    spacing : Spacing
+        Spacing.LINEAR for linspace, Spacing.GEOMETRIC for geomspace
+        
+    Returns:
+    --------
+    x : np.ndarray
+        Grid points
+    pmf : np.ndarray
+        PMF values at grid points
+    p_neg_inf : float
+        Probability mass at -∞
+    p_pos_inf : float
+        Probability mass at +∞
+        
+    Algorithm per IMPLEMENTATION_GUIDE_NUMBA.md:
+    1. Determine range via quantiles: [q_min, q_max] = [beta/2, 1-beta/2]
+    2. Create geometric spacing in this range
+    3. Discretize using CDF differences
+    4. Assign tail masses to ±∞ based on mode
+    """
+    if n_grid < 2:
+        raise ValueError(f"n_grid must be >= 2, got {n_grid}")
+    if not (0 < beta < 1):
+        raise ValueError(f"beta must be in (0, 1), got {beta}")
+    
+    # Step 1: Determine range via quantiles
+    q_min = dist.ppf(beta / 2)
+    q_max = dist.ppf(1 - beta / 2)
+    
+    if not np.isfinite(q_min) or not np.isfinite(q_max):
+        raise ValueError(f"Quantiles not finite: q_min={q_min}, q_max={q_max}")
+    
+    # Step 2: Create spacing based on spacing parameter
+    if spacing == Spacing.GEOMETRIC:
+        # Geometric spacing
+        if q_min > 0:
+            # Positive support: use geomspace directly
+            x = np.geomspace(q_min, q_max, n_grid, dtype=np.float64)
+        elif q_max < 0:
+            # Negative support: geomspace on absolute values, then negate and reverse
+            x = -np.geomspace(-q_max, -q_min, n_grid, dtype=np.float64)[::-1]
+        else:
+            # Support contains 0: cannot use geometric spacing
+            raise ValueError(f"Cannot use geometric spacing when range [{q_min:.6f}, {q_max:.6f}] contains 0. "
+                           f"Use spacing='linear' instead.")
     else:
-        if max_points is None or max_points < 2:
-            raise ValueError("range-linear strategy requires max_points >= 2")
-        lo, hi = support_bounds(xX, xY)
-        t = np.linspace(lo, hi, max_points, dtype=np.float64)
-        if t.size > 1:
-            t[1:] += np.linspace(1e-12, 1e-9, t.size-1)
-        return np.ascontiguousarray(t, dtype=np.float64)
-
-def build_grid_pmf_cdf(xX: np.ndarray, xY: np.ndarray, *, max_points: Optional[int] = None, strategy: Literal["trim-log","minkowski","range-linear"] = "trim-log", beta: float = 1e-6) -> np.ndarray:
-    return build_grid_pmf_pmf(xX, xY, max_points=max_points, strategy=strategy, beta=beta)
-
-def build_grid_pmf_ccdf(xX: np.ndarray, xY: np.ndarray, *, max_points: Optional[int] = None, strategy: Literal["trim-log","minkowski","range-linear"] = "trim-log", beta: float = 1e-6) -> np.ndarray:
-    return build_grid_pmf_pmf(xX, xY, max_points=max_points, strategy=strategy, beta=beta)
-
-def build_grid_self_convolution(x_base: np.ndarray, T: int, *, max_points: Optional[int] = None, strategy: Literal["minkowski-repeated","range-linear"] = "range-linear") -> np.ndarray:
-    x = _strict_f64(x_base)
-    if T <= 0:
-        raise ValueError("T must be positive")
-    if strategy == "minkowski-repeated":
-        t = x.copy()
-        reps = T - 1
-        while reps > 0:
-            t = minkowski_sum_unique(t, x)
-            if max_points is not None:
-                t = _decimate_uniform(t, max_points)
-            reps -= 1
-        return t
-    else:
-        if max_points is None or max_points < 2:
-            max_points = max(257, int(4 * np.sqrt(x.size) * np.log2(max(T,2))))
-        lo = float(T * x[0]); hi = float(T * x[-1])
-        t = np.linspace(lo, hi, max_points, dtype=np.float64)
-        if t.size > 1:
-            t[1:] += np.linspace(1e-12, 1e-9, t.size-1)
-        return np.ascontiguousarray(t, dtype=np.float64)
+        # Linear spacing
+        x = np.linspace(q_min, q_max, n_grid, dtype=np.float64)
+    
+    # Ensure strict ordering
+    x = np.ascontiguousarray(x, dtype=np.float64)
+    
+    # Step 3: Discretize to PMF using CDF
+    F = dist.cdf(x)
+    
+    if mode == Mode.DOMINATES:
+        # Upper bound: CDF-based discretization
+        # pmf[i] = F(x[i+1]) - F(x[i])
+        pmf = np.zeros(n_grid, dtype=np.float64)
+        pmf[:-1] = np.diff(F)
+        pmf[-1] = 0.0  # Last bin gets no mass (goes to p_pos_inf)
+        
+        p_neg_inf = F[0]
+        p_pos_inf = 1.0 - F[-1]
+        
+    else:  # IS_DOMINATED
+        # Lower bound: CCDF-based discretization
+        # pmf[i] = (1-F(x[i])) - (1-F(x[i+1])) = F(x[i+1]) - F(x[i])
+        # But first bin starts at x[0], not -∞
+        pmf = np.zeros(n_grid, dtype=np.float64)
+        pmf[0] = F[0]  # Mass from -∞ to x[0]
+        pmf[1:] = np.diff(F)
+        
+        p_neg_inf = 0.0  # Lower bound: no mass can go to -∞
+        p_pos_inf = 1.0 - F[-1]
+    
+    # Step 4: Budget correction
+    pmf = np.maximum(pmf, 0.0)  # Ensure non-negative
+    total = pmf.sum() + p_neg_inf + p_pos_inf
+    if abs(total - 1.0) > 1e-10:
+        # Correct the last bin
+        if pmf[-1] + (1.0 - total) >= 0:
+            pmf[-1] += (1.0 - total)
+        else:
+            # Distribute error across all bins
+            pmf *= (1.0 - p_neg_inf - p_pos_inf) / pmf.sum() if pmf.sum() > 0 else 0
+    
+    return x, pmf, float(p_neg_inf), float(p_pos_inf)

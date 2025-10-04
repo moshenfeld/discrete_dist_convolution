@@ -1,7 +1,19 @@
 
+from typing import TYPE_CHECKING
 import numpy as np
 
-def step_cdf_left(x: np.ndarray, F: np.ndarray, p_neg_inf: float, p_pos_inf: float, q: float) -> float:
+if TYPE_CHECKING:
+    from discrete_conv_api import DiscreteDist
+
+def step_cdf_left(dist: "DiscreteDist", q: float) -> float:
+    """Evaluate left-continuous CDF step function at q."""
+    if dist.kind != 'cdf':
+        raise ValueError(f"step_cdf_left expects CDF, got {dist.kind}")
+    x = dist.x
+    F = dist.vals
+    p_neg_inf = dist.p_neg_inf
+    p_pos_inf = dist.p_pos_inf
+    
     if q < x[0]:
         return float(p_neg_inf)
     if q >= x[-1]:
@@ -11,7 +23,15 @@ def step_cdf_left(x: np.ndarray, F: np.ndarray, p_neg_inf: float, p_pos_inf: flo
         return float(p_neg_inf)
     return float(F[idx])
 
-def step_cdf_right(x: np.ndarray, F: np.ndarray, p_neg_inf: float, p_pos_inf: float, q: float) -> float:
+def step_cdf_right(dist: "DiscreteDist", q: float) -> float:
+    """Evaluate right-continuous CDF step function at q."""
+    if dist.kind != 'cdf':
+        raise ValueError(f"step_cdf_right expects CDF, got {dist.kind}")
+    x = dist.x
+    F = dist.vals
+    p_neg_inf = dist.p_neg_inf
+    p_pos_inf = dist.p_pos_inf
+    
     if q < x[0]:
         return float(p_neg_inf)
     if q >= x[-1]:
@@ -21,7 +41,15 @@ def step_cdf_right(x: np.ndarray, F: np.ndarray, p_neg_inf: float, p_pos_inf: fl
         return float(p_neg_inf)
     return float(F[idx])
 
-def step_ccdf_left(x: np.ndarray, S: np.ndarray, p_neg_inf: float, p_pos_inf: float, q: float) -> float:
+def step_ccdf_left(dist: "DiscreteDist", q: float) -> float:
+    """Evaluate left-continuous CCDF step function at q."""
+    if dist.kind != 'ccdf':
+        raise ValueError(f"step_ccdf_left expects CCDF, got {dist.kind}")
+    x = dist.x
+    S = dist.vals
+    p_neg_inf = dist.p_neg_inf
+    p_pos_inf = dist.p_pos_inf
+    
     if q < x[0]:
         return float(1.0 - p_neg_inf)
     if q >= x[-1]:
@@ -31,7 +59,15 @@ def step_ccdf_left(x: np.ndarray, S: np.ndarray, p_neg_inf: float, p_pos_inf: fl
         return float(1.0 - p_neg_inf)
     return float(S[idx])
 
-def step_ccdf_right(x: np.ndarray, S: np.ndarray, p_neg_inf: float, p_pos_inf: float, q: float) -> float:
+def step_ccdf_right(dist: "DiscreteDist", q: float) -> float:
+    """Evaluate right-continuous CCDF step function at q."""
+    if dist.kind != 'ccdf':
+        raise ValueError(f"step_ccdf_right expects CCDF, got {dist.kind}")
+    x = dist.x
+    S = dist.vals
+    p_neg_inf = dist.p_neg_inf
+    p_pos_inf = dist.p_pos_inf
+    
     if q < x[0]:
         return float(1.0 - p_neg_inf)
     if q >= x[-1]:

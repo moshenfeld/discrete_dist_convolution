@@ -14,7 +14,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 import numpy as np
-from discrete_conv_api import DiscreteDist, self_convolve_pmf
+from discrete_conv_api import DiscreteDist, self_convolve_pmf, Spacing
 
 def create_gaussian_pmf(n: int, mu: float = 0.0, sigma: float = 1.0) -> DiscreteDist:
     """Create a discrete Gaussian PMF."""
@@ -33,12 +33,6 @@ def create_gaussian_pmf(n: int, mu: float = 0.0, sigma: float = 1.0) -> Discrete
 
 def test_self_convolution(base: DiscreteDist, T: int, n_output: int):
     """Test self-convolution with detailed timing."""
-    # Create output grid
-    x_min, x_max = np.min(base.x), np.max(base.x)
-    t_min = T * x_min - abs(x_min) * 2
-    t_max = T * x_max + abs(x_max) * 2
-    t = np.linspace(t_min, t_max, n_output, dtype=np.float64)
-    
     # Expected number of convolutions
     n_convolutions = int(np.ceil(np.log2(T))) + bin(T).count('1') - 1
     
@@ -46,22 +40,24 @@ def test_self_convolution(base: DiscreteDist, T: int, n_output: int):
     
     # Warmup (JIT compilation)
     if T == 10:  # Only warmup on first run
-        _ = self_convolve_pmf(base, T, t=t, mode='DOMINATES')
+        _ = self_convolve_pmf(base, T, mode='DOMINATES', spacing=Spacing.LINEAR)
         print("[warmup] ", end='', flush=True)
     
-    # Timed run
+    # Timed run with automatic grid generation
     start = time.perf_counter()
-    Z = self_convolve_pmf(base, T, t=t, mode='DOMINATES')
+    Z = self_convolve_pmf(base, T, mode='DOMINATES', spacing=Spacing.LINEAR)
     elapsed = time.perf_counter() - start
     
     total_mass = Z.vals.sum() + Z.p_neg_inf + Z.p_pos_inf
     
     # Calculate effective throughput
-    ops_per_conv = n_output * n_output
+    # Note: output grid size may vary with automatic generation
+    output_size = len(Z.x)
+    ops_per_conv = output_size * output_size
     total_ops = n_convolutions * ops_per_conv
     throughput = total_ops / elapsed / 1e6  # M ops/sec
     
-    print(f"{elapsed:7.3f}s | {n_convolutions:2d} convs | {throughput:5.1f} M ops/s | mass={total_mass:.8f}")
+    print(f"{elapsed:7.3f}s | {n_convolutions:2d} convs | {throughput:5.1f} M ops/s | mass={total_mass:.8f} | grid={output_size}")
     
     return elapsed, n_convolutions
 
@@ -69,7 +65,8 @@ def run_progressive_tests():
     """Run progressive tests, stopping if performance is too slow."""
     print("="*80)
     print("Progressive Self-Convolution Testing")
-    print("Testing T=10, 100, 1000 with different grid sizes")
+    print("Testing T=10, 100, 1000 with different base grid sizes")
+    print("(Output grids are generated automatically)")
     print("="*80)
     
     T_values = [10, 100, 1000]

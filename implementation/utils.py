@@ -1,6 +1,9 @@
 
-from typing import Sequence
+from typing import Sequence, TYPE_CHECKING
 import numpy as np
+
+if TYPE_CHECKING:
+    from discrete_conv_api import DiscreteDist
 
 def ensure_f64_c(a: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(a, dtype=np.float64)
@@ -41,7 +44,13 @@ def reconcile_cdf(lower: np.ndarray, upper: np.ndarray) -> None:
 def reconcile_ccdf(lower: np.ndarray, upper: np.ndarray) -> None:
     np.maximum(upper, lower, out=upper)
 
-def budget_correction_last_bin(pmf: np.ndarray, p_neg: float, p_pos: float, expected_total: float = 1.0, tol: float = 1e-12) -> None:
+def budget_correction_last_bin(dist: "DiscreteDist", expected_total: float = 1.0, tol: float = 1e-12) -> None:
+    """Correct budget in last bin of PMF (modifies dist.vals in-place)."""
+    if dist.kind != 'pmf':
+        raise ValueError(f"budget_correction_last_bin expects PMF, got {dist.kind}")
+    pmf = dist.vals
+    p_neg = dist.p_neg_inf
+    p_pos = dist.p_pos_inf
     eps = (p_neg + float(pmf.sum()) + p_pos) - expected_total
     if abs(eps) <= tol and pmf.size:
         pmf[-1] -= eps

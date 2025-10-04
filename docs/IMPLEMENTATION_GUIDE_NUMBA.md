@@ -1,6 +1,12 @@
 
 # Numerical Convolution Package — Numba Implementation Guide
 
+**Note**: This guide describes the low-level implementation details. For API usage, see `../USAGE_NEW_GRID.md` and `../README.md`.
+
+**Current Status (Oct 2025)**: PMF×PMF kernel and self-convolution fully implemented with automatic grid generation. CDF/CCDF Stieltjes kernels are stub implementations.
+
+---
+
 This guide specifies *exactly* how to implement the kernels and dispatchers in Numba,
 capturing all envelope semantics, tie-breaking, ±∞ mass accounting, and grid selection.
 
@@ -73,23 +79,75 @@ Maintain `(cur_pmf, acc_env)`:
 
 ---
 
-## Grid selection strategies (default = **trim‑log**)
+## Initial Grid Generation from Continuous Distribution
 
-When producing anchors `t` for `Z = X ⊕ Y`:
+To discretize a continuous distribution onto a grid for convolution:
 
-- **trim‑log (default)**: drop total tail `β` via `q = sqrt(β/2)` on each input CDF. Set
+**Input parameters:**
+- `n_grid`: Number of grid points
+- `beta`: Tail probability to trim (e.g., 1e-6)
+- `dist`: Continuous distribution with CDF/quantile methods
+- `dir`: Bound direction ('upper' for DOMINATES, 'lower' for IS_DOMINATED)
+
+**Algorithm:**
+
+1. **Determine range via quantiles:**
+   - `q_min = dist.quantile(beta/2)`
+   - `q_max = dist.quantile(1 - beta/2)`
+
+2. **Create geometric spacing:**
+   - If support is positive (q_min > 0): `grid = geomspace(q_min, q_max, n_grid)`
+   - If support contains 0: Split into negative and positive regions with geometric spacing
+   - If support is negative: `grid = -geomspace(-q_max, -q_min, n_grid)[::-1]`
+
+3. **Discretize to PMF using CDF/CCDF:**
+   - For **upper bound** (DOMINATES):
+     - Compute `pmf[i] = CDF(grid[i+1]) - CDF(grid[i])` for interior points
+     - Set `p_neg_inf = CDF(grid[0])`
+     - Set `p_pos_inf = 1 - CDF(grid[-1])`
+   
+   - For **lower bound** (IS_DOMINATED):
+     - Compute `pmf[i] = CCDF(grid[i]) - CCDF(grid[i+1])` for interior points
+     - Set `p_neg_inf = 0` (mass at -∞ cannot increase in lower bound)
+     - Set `p_pos_inf = CCDF(grid[-1])`
+
+4. **Budget correction:** Ensure `sum(pmf) + p_neg_inf + p_pos_inf = 1.0`
+
+## Grid selection strategies
+
+### Current Implementation (Oct 2025): **Support Bounds**
+
+When producing anchors `t` for `Z = X ⊕ Y`, the **default strategy** uses support bounds:
+
+- **support-bounds (default)**: 
+  - Output size: `z_size = max(len(xX), len(xY))`
+  - Bounds: `z_min = xX[0] + xY[0]`, `z_max = xX[-1] + xY[-1]`
+  - Spacing: User-specified via `Spacing` enum
+    - `Spacing.LINEAR`: `np.linspace(z_min, z_max, z_size)`
+    - `Spacing.GEOMETRIC`: `np.geomspace(z_min, z_max, z_size)` (requires z_min, z_max same sign)
+  - Implementation: `implementation.grids.build_grid_from_support_bounds(xX, xY, spacing=Spacing.LINEAR)`
+  - Grid generation happens **inside** convolution kernels automatically
+
+**Key properties:**
+- Predictable output size (matches max input size)
+- Full support coverage (no probability mass outside grid except at ±∞)
+- Consistent spacing type across operations
+- No tail trimming needed (handled at discretization stage)
+
+### Legacy Strategies (Available but Not Default)
+
+- **trim‑log**: drop total tail `β` via `q = sqrt(β/2)` on each input CDF. Set
   `z_min = x_lo + y_lo`, `z_max = x_hi + y_hi`, build a **log‑spaced** grid on `[z_min, z_max]`
-  with `z_size` points. Assumes **positive support**; if violated/degenerate, fallback to
-  `range-linear` (default) or `minkowski`.
-  - `implementation.grids.build_grid_trim_log_from_dists(X, Y, beta=1e-6, z_size=None)`
-  - `..._from_cdfs(xX, FX, xY, FY, ...)`
+  - Still available via `build_grid_trim_log_from_dists(X, Y, beta=1e-6, z_size=None)`
+  - Assumes **positive support**; fallback to range-linear or minkowski if violated
 
-- **minkowski**: exact `{x_i + y_j}`; optionally decimate.
-- **range‑linear**: `linspace` over `[xX[0]+xY[0], xX[-1]+xY[-1]]` (or `[T*min(x), T*max(x)]`).
+- **minkowski**: exact `{x_i + y_j}`; optionally decimate
+- **range‑linear**: equivalent to support-bounds with linear spacing
 
-**API defaults (`t=None`)**:
-- Pairwise: uses **trim‑log** (from `DiscreteDist` inputs).
-- Self‑convolution: uses **range‑linear** with a heuristic size.
+**Current API:**
+- All convolution functions use **support-bounds** with user-specified spacing
+- Functions return `DiscreteDist` objects directly (not tuples)
+- Grid generation is automatic and internal to kernels
 
 ---
 
