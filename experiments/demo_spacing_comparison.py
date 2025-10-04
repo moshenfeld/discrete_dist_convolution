@@ -20,7 +20,7 @@ sys.path.insert(0, str(project_root))
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
-from discrete_conv_api import discretize_continuous_to_pmf, self_convolve_pmf, DiscreteDist, GridMode, Spacing
+from discrete_conv_api import discretize_continuous_to_pmf, self_convolve_pmf, DiscreteDist, Mode, Spacing, DistKind
 
 # Standard parameters
 N_BINS = 5000
@@ -56,13 +56,13 @@ def run_experiment(dist_name, dist_base, spacing, T_values):
     # Discretize base distribution
     try:
         x_upper, pmf_upper, pneg_upper, ppos_upper = discretize_continuous_to_pmf(
-            dist_base, N_BINS, BETA, mode=GridMode.DOMINATES, spacing=spacing_enum)
+            dist_base, N_BINS, BETA, mode=Mode.DOMINATES, spacing=spacing_enum)
         x_lower, pmf_lower, pneg_lower, ppos_lower = discretize_continuous_to_pmf(
-            dist_base, N_BINS, BETA, mode=GridMode.IS_DOMINATED, spacing=spacing_enum)
+            dist_base, N_BINS, BETA, mode=Mode.IS_DOMINATED, spacing=spacing_enum)
         
-        base_upper = DiscreteDist(x=x_upper, kind='pmf', vals=pmf_upper, 
+        base_upper = DiscreteDist(x=x_upper, kind=DistKind.PMF, vals=pmf_upper, 
                                   p_neg_inf=pneg_upper, p_pos_inf=ppos_upper, name=f'{dist_name}-upper')
-        base_lower = DiscreteDist(x=x_lower, kind='pmf', vals=pmf_lower,
+        base_lower = DiscreteDist(x=x_lower, kind=DistKind.PMF, vals=pmf_lower,
                                   p_neg_inf=pneg_lower, p_pos_inf=ppos_lower, name=f'{dist_name}-lower')
     except ValueError as e:
         print(f"ERROR: {e}")

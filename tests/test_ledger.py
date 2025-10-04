@@ -1,6 +1,6 @@
 import numpy as np
 from implementation.ledger import infinity_ledger_from_pmfs
-from discrete_conv_api import DiscreteDist
+from discrete_conv_api import DiscreteDist, DistKind
 
 def test_ledger_no_ambiguous_cross():
     mX, pnegX, pposX = 0.6, 0.1, 0.0
@@ -9,9 +9,9 @@ def test_ledger_no_ambiguous_cross():
     # add_pos = pposX*(mY+pposY)+pposY*mX = 0
     
     # Create distributions with correct masses
-    X = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([mX]), 
+    X = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mX]), 
                      p_neg_inf=pnegX, p_pos_inf=pposX)
-    Y = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([mY]), 
+    Y = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mY]), 
                      p_neg_inf=pnegY, p_pos_inf=pposY)
     
     for mode in ("DOMINATES","IS_DOMINATED"):
@@ -28,9 +28,9 @@ def test_ledger_with_ambiguous_cross_routing():
     # ambiguous cross m_cross = pnegX*pposY + pposX*pnegY = 0.3*0.4 + 0 = 0.12
     
     # Create distributions
-    X = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([mX]), 
+    X = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mX]), 
                      p_neg_inf=pnegX, p_pos_inf=pposX)
-    Y = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([mY]), 
+    Y = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([mY]), 
                      p_neg_inf=pnegY, p_pos_inf=pposY)
     
     add_neg, add_pos = infinity_ledger_from_pmfs(X, Y, "DOMINATES")

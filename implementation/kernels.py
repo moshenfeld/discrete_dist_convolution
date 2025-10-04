@@ -1,15 +1,13 @@
-from typing import Literal, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional
 import numpy as np
 from numba import njit
 from .ledger import infinity_ledger_from_pmfs
 from .steps import step_cdf_right, step_cdf_left, step_ccdf_right, step_ccdf_left
-from .utils import clip_to_feasible_cdf, clip_to_feasible_ccdf, running_max_inplace, running_min_reverse_inplace
+# Removed unused imports
+from .types import Mode, Spacing, DistKind
 
 if TYPE_CHECKING:
-    from discrete_conv_api import DiscreteDist
-    from .grids import Spacing
-
-Mode = Literal["DOMINATES", "IS_DOMINATED"]
+    from .types import DiscreteDist
 
 @njit(cache=True)
 def _pmf_pmf_kernel_numba(xX: np.ndarray, pX: np.ndarray, 
@@ -73,7 +71,7 @@ def convolve_pmf_pmf_to_pmf_core(X: "DiscreteDist", Y: "DiscreteDist", mode: Mod
     --------
     DiscreteDist: Result distribution as PMF
     """
-    if X.kind != 'pmf' or Y.kind != 'pmf':
+    if X.kind != DistKind.PMF or Y.kind != DistKind.PMF:
         raise ValueError(f'convolve_pmf_pmf_to_pmf_core expects PMF inputs, got {X.kind}, {Y.kind}')
     
     # Import here to avoid circular dependency
@@ -95,7 +93,7 @@ def convolve_pmf_pmf_to_pmf_core(X: "DiscreteDist", Y: "DiscreteDist", mode: Mod
     pnegZ = pneg_extra + add_neg
     pposZ = ppos_extra + add_pos
     
-    return DiscreteDist(x=t, kind='pmf', vals=pmf_out, p_neg_inf=pnegZ, p_pos_inf=pposZ)
+    return DiscreteDist(x=t, kind=DistKind.PMF, vals=pmf_out, p_neg_inf=pnegZ, p_pos_inf=pposZ)
 
 def _convolve_pmf_pmf_on_grid(X: "DiscreteDist", Y: "DiscreteDist", t: np.ndarray, mode: Mode):
     """
@@ -113,7 +111,7 @@ def _convolve_pmf_pmf_on_grid(X: "DiscreteDist", Y: "DiscreteDist", t: np.ndarra
     pnegZ: Total mass at -∞
     pposZ: Total mass at +∞
     """
-    if X.kind != 'pmf' or Y.kind != 'pmf':
+    if X.kind != DistKind.PMF or Y.kind != DistKind.PMF:
         raise ValueError(f'convolve_pmf_pmf_to_pmf_core expects PMF inputs, got {X.kind}, {Y.kind}')
     
     # Compute finite-finite convolution with tie-breaking
@@ -134,7 +132,7 @@ def convolve_pmf_cdf_to_cdf_core(X: "DiscreteDist", Y: "DiscreteDist", t: np.nda
     """
     PMF×CDF → CDF envelope core (pseudocode in docstring). Returns (F, pnegZ_add, pposZ_add).
     """
-    if X.kind != 'pmf' or Y.kind != 'cdf':
+    if X.kind != DistKind.PMF or Y.kind != DistKind.CDF:
         raise ValueError(f'convolve_pmf_cdf_to_cdf_core expects X:PMF, Y:CDF, got {X.kind}, {Y.kind}')
     
     F = np.zeros_like(t, dtype=np.float64)
@@ -145,7 +143,7 @@ def convolve_pmf_ccdf_to_ccdf_core(X: "DiscreteDist", Y: "DiscreteDist", t: np.n
     """
     PMF×CCDF → CCDF envelope core (pseudocode in docstring). Returns (S, pnegZ_add, pposZ_add).
     """
-    if X.kind != 'pmf' or Y.kind != 'ccdf':
+    if X.kind != DistKind.PMF or Y.kind != DistKind.CCDF:
         raise ValueError(f'convolve_pmf_ccdf_to_ccdf_core expects X:PMF, Y:CCDF, got {X.kind}, {Y.kind}')
     
     S = np.zeros_like(t, dtype=np.float64)

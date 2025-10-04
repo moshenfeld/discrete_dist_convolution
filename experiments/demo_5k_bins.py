@@ -19,11 +19,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 from discrete_conv_api import (
+    DistKind,
     discretize_continuous_to_pmf, 
     convolve_pmf_pmf_to_pmf, 
     self_convolve_pmf, 
     DiscreteDist,
-    GridMode,
+    Mode,
     Spacing
 )
 
@@ -43,18 +44,18 @@ def demo_pairwise_convolution():
     
     # Discretize using the refactored API
     x_x, pmf_x_upper, pneg_x_upper, ppos_x_upper = discretize_continuous_to_pmf(
-        dist_X, N_BINS, BETA, mode=GridMode.DOMINATES, spacing=Spacing.LINEAR)
-    X_upper = DiscreteDist(x=x_x, kind='pmf', vals=pmf_x_upper, 
+        dist_X, N_BINS, BETA, mode=Mode.DOMINATES, spacing=Spacing.LINEAR)
+    X_upper = DiscreteDist(x=x_x, kind=DistKind.PMF, vals=pmf_x_upper, 
                           p_neg_inf=pneg_x_upper, p_pos_inf=ppos_x_upper, name='N(0,1)-upper')
     
     x_x_lower, pmf_x_lower, pneg_x_lower, ppos_x_lower = discretize_continuous_to_pmf(
-        dist_X, N_BINS, BETA, mode=GridMode.IS_DOMINATED, spacing=Spacing.LINEAR)
-    X_lower = DiscreteDist(x=x_x_lower, kind='pmf', vals=pmf_x_lower, 
+        dist_X, N_BINS, BETA, mode=Mode.IS_DOMINATED, spacing=Spacing.LINEAR)
+    X_lower = DiscreteDist(x=x_x_lower, kind=DistKind.PMF, vals=pmf_x_lower, 
                           p_neg_inf=pneg_x_lower, p_pos_inf=ppos_x_lower, name='N(0,1)-lower')
     
     x_y, pmf_y_upper, pneg_y_upper, ppos_y_upper = discretize_continuous_to_pmf(
-        dist_Y, N_BINS, BETA, mode=GridMode.DOMINATES, spacing=Spacing.LINEAR)
-    Y_upper = DiscreteDist(x=x_y, kind='pmf', vals=pmf_y_upper, 
+        dist_Y, N_BINS, BETA, mode=Mode.DOMINATES, spacing=Spacing.LINEAR)
+    Y_upper = DiscreteDist(x=x_y, kind=DistKind.PMF, vals=pmf_y_upper, 
                           p_neg_inf=pneg_y_upper, p_pos_inf=ppos_y_upper, name='N(1,0.8)-upper')
     
     print(f"Input X (upper): {X_upper.name}, {len(X_upper.x):,} bins, mass={X_upper.vals.sum():.10f}")
@@ -110,13 +111,13 @@ def demo_self_convolution():
     # Create base distribution using proper discretization
     dist_base = stats.norm(0, 1)
     x_base, pmf_base_upper, pneg_base_upper, ppos_base_upper = discretize_continuous_to_pmf(
-        dist_base, N_BINS, BETA, mode=GridMode.DOMINATES, spacing=Spacing.LINEAR)
-    base_upper = DiscreteDist(x=x_base, kind='pmf', vals=pmf_base_upper,
+        dist_base, N_BINS, BETA, mode=Mode.DOMINATES, spacing=Spacing.LINEAR)
+    base_upper = DiscreteDist(x=x_base, kind=DistKind.PMF, vals=pmf_base_upper,
                              p_neg_inf=pneg_base_upper, p_pos_inf=ppos_base_upper, name='N(0,1)')
     
     x_base_lower, pmf_base_lower, pneg_base_lower, ppos_base_lower = discretize_continuous_to_pmf(
-        dist_base, N_BINS, BETA, mode=GridMode.IS_DOMINATED, spacing=Spacing.LINEAR)
-    base_lower = DiscreteDist(x=x_base_lower, kind='pmf', vals=pmf_base_lower,
+        dist_base, N_BINS, BETA, mode=Mode.IS_DOMINATED, spacing=Spacing.LINEAR)
+    base_lower = DiscreteDist(x=x_base_lower, kind=DistKind.PMF, vals=pmf_base_lower,
                              p_neg_inf=pneg_base_lower, p_pos_inf=ppos_base_lower, name='N(0,1)')
     
     print(f"Base: {base_upper.name}, {len(base_upper.x):,} bins, mass={base_upper.vals.sum():.10f}")

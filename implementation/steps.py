@@ -1,13 +1,14 @@
 
 from typing import TYPE_CHECKING
 import numpy as np
+from .types import DistKind
 
 if TYPE_CHECKING:
-    from discrete_conv_api import DiscreteDist
+    from .types import DiscreteDist
 
 def step_cdf_left(dist: "DiscreteDist", q: float) -> float:
     """Evaluate left-continuous CDF step function at q."""
-    if dist.kind != 'cdf':
+    if dist.kind != DistKind.CDF:
         raise ValueError(f"step_cdf_left expects CDF, got {dist.kind}")
     x = dist.x
     F = dist.vals
@@ -25,7 +26,7 @@ def step_cdf_left(dist: "DiscreteDist", q: float) -> float:
 
 def step_cdf_right(dist: "DiscreteDist", q: float) -> float:
     """Evaluate right-continuous CDF step function at q."""
-    if dist.kind != 'cdf':
+    if dist.kind != DistKind.CDF:
         raise ValueError(f"step_cdf_right expects CDF, got {dist.kind}")
     x = dist.x
     F = dist.vals
@@ -43,7 +44,7 @@ def step_cdf_right(dist: "DiscreteDist", q: float) -> float:
 
 def step_ccdf_left(dist: "DiscreteDist", q: float) -> float:
     """Evaluate left-continuous CCDF step function at q."""
-    if dist.kind != 'ccdf':
+    if dist.kind != DistKind.CCDF:
         raise ValueError(f"step_ccdf_left expects CCDF, got {dist.kind}")
     x = dist.x
     S = dist.vals
@@ -61,7 +62,7 @@ def step_ccdf_left(dist: "DiscreteDist", q: float) -> float:
 
 def step_ccdf_right(dist: "DiscreteDist", q: float) -> float:
     """Evaluate right-continuous CCDF step function at q."""
-    if dist.kind != 'ccdf':
+    if dist.kind != DistKind.CCDF:
         raise ValueError(f"step_ccdf_right expects CCDF, got {dist.kind}")
     x = dist.x
     S = dist.vals

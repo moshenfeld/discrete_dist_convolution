@@ -2,16 +2,16 @@
 import numpy as np
 import pytest
 from implementation.kernels import _convolve_pmf_pmf_on_grid
-from discrete_conv_api import DiscreteDist
+from discrete_conv_api import DiscreteDist, DistKind
 
 def test_pmf_pmf_simple_no_infinity():
     """Test basic PMF×PMF convolution without infinity masses."""
     # X: delta at 0
-    X = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([1.0]),
+    X = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([1.0]),
                      p_neg_inf=0.0, p_pos_inf=0.0)
     
     # Y: delta at 1
-    Y = DiscreteDist(x=np.array([1.0]), kind='pmf', vals=np.array([1.0]),
+    Y = DiscreteDist(x=np.array([1.0]), kind=DistKind.PMF, vals=np.array([1.0]),
                      p_neg_inf=0.0, p_pos_inf=0.0)
     
     # Output grid includes the sum
@@ -37,11 +37,11 @@ def test_pmf_pmf_simple_no_infinity():
 def test_pmf_pmf_edge_routing():
     """Test that edge masses route correctly to ±∞."""
     # X: delta at 0
-    X = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([1.0]),
+    X = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([1.0]),
                      p_neg_inf=0.0, p_pos_inf=0.0)
     
     # Y: two masses
-    Y = DiscreteDist(x=np.array([0.0, 2.0]), kind='pmf', vals=np.array([0.3, 0.7]),
+    Y = DiscreteDist(x=np.array([0.0, 2.0]), kind=DistKind.PMF, vals=np.array([0.3, 0.7]),
                      p_neg_inf=0.0, p_pos_inf=0.0)
     
     # Output grid that captures only the first sum
@@ -66,11 +66,11 @@ def test_pmf_pmf_edge_routing():
 def test_pmf_pmf_with_infinity_masses():
     """Test PMF×PMF with existing infinity masses."""
     # X with mass at -∞
-    X = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([0.5]),
+    X = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([0.5]),
                      p_neg_inf=0.3, p_pos_inf=0.2)
     
     # Y with mass at +∞
-    Y = DiscreteDist(x=np.array([0.0]), kind='pmf', vals=np.array([0.4]),
+    Y = DiscreteDist(x=np.array([0.0]), kind=DistKind.PMF, vals=np.array([0.4]),
                      p_neg_inf=0.1, p_pos_inf=0.5)
     
     t = np.array([-1.0, 0.0, 1.0])
@@ -105,8 +105,8 @@ def test_pmf_pmf_budget_conservation():
     pnegY = 0.05
     pposY = 1.0 - pY.sum() - pnegY
     
-    X = DiscreteDist(x=xX, kind='pmf', vals=pX, p_neg_inf=pnegX, p_pos_inf=pposX)
-    Y = DiscreteDist(x=xY, kind='pmf', vals=pY, p_neg_inf=pnegY, p_pos_inf=pposY)
+    X = DiscreteDist(x=xX, kind=DistKind.PMF, vals=pX, p_neg_inf=pnegX, p_pos_inf=pposX)
+    Y = DiscreteDist(x=xY, kind=DistKind.PMF, vals=pY, p_neg_inf=pnegY, p_pos_inf=pposY)
     
     # Wide output grid to capture everything
     t = np.linspace(xX[0] + xY[0] - 1, xX[-1] + xY[-1] + 1, 50)

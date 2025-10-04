@@ -35,13 +35,13 @@ def test_reconcile_helpers():
     assert np.all(upper2 >= lower2 - 1e-15)
 
 def test_budget_correction_last_bin():
-    from discrete_conv_api import DiscreteDist
+    from discrete_conv_api import DiscreteDist, DistKind
     
     pmf = np.array([0.2, 0.3, 0.4], dtype=np.float64)
     pneg, ppos = 0.0, 0.11
     x = np.array([0.0, 1.0, 2.0], dtype=np.float64)
     
-    dist = DiscreteDist(x=x, kind='pmf', vals=pmf, p_neg_inf=pneg, p_pos_inf=ppos)
+    dist = DiscreteDist(x=x, kind=DistKind.PMF, vals=pmf, p_neg_inf=pneg, p_pos_inf=ppos)
     # Sum = 1.01 -> eps = 0.01, within tol=0.02 -> last bin -0.01
     U.budget_correction_last_bin(dist, expected_total=1.0, tol=0.02)
     assert abs(dist.p_neg_inf + dist.vals.sum() + dist.p_pos_inf - 1.0) < 1e-15

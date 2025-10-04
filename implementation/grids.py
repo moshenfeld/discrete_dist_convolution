@@ -1,32 +1,8 @@
 
 from typing import Sequence, Tuple, Optional, Literal, Protocol, Union, Callable
-from enum import Enum
 import numpy as np
 from scipy import stats
-
-class Mode(Enum):
-    """Tie-breaking mode for discretization."""
-    DOMINATES = "DOMINATES"  # Upper bound (exact hits round up)
-    IS_DOMINATED = "IS_DOMINATED"  # Lower bound (exact hits round down)
-
-class Spacing(Enum):
-    """Grid spacing strategy."""
-    LINEAR = "linear"  # Linear spacing (linspace)
-    GEOMETRIC = "geometric"  # Geometric spacing (geomspace)
-
-class ContinuousDist(Protocol):
-    """Protocol for continuous distributions."""
-    def cdf(self, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """Cumulative distribution function."""
-        ...
-    
-    def ppf(self, q: float) -> float:
-        """Percent point function (quantile/inverse CDF)."""
-        ...
-    
-    def sf(self, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """Survival function (1 - CDF), also called CCDF."""
-        ...
+from .types import Mode, Spacing
 
 def _strict_f64(x: np.ndarray) -> np.ndarray:
     x = np.ascontiguousarray(x, dtype=np.float64)
@@ -153,7 +129,7 @@ def build_grid_from_support_bounds(dist_x, dist_y, spacing, beta):
     
     return np.ascontiguousarray(t, dtype=np.float64)
 
-def discretize_continuous_to_pmf(dist: ContinuousDist,
+def discretize_continuous_to_pmf(dist: stats.rv_continuous,
                                   n_grid: int,
                                   beta: float = 1e-6,
                                   mode: Mode = Mode.DOMINATES,
@@ -163,7 +139,7 @@ def discretize_continuous_to_pmf(dist: ContinuousDist,
     
     Parameters:
     -----------
-    dist : ContinuousDist
+    dist : scipy.stats.rv_continuous
         Continuous distribution object with cdf(), ppf(), and sf() methods
     n_grid : int
         Number of grid points
