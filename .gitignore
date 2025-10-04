@@ -127,6 +127,9 @@ dmypy.json
 *.tiff
 *.svg
 
+# Data files
+*.json
+
 # IDE files
 .vscode/
 .idea/

@@ -153,8 +153,8 @@ Z = self_convolve_pmf(base, T, mode='DOMINATES', spacing=Spacing.LINEAR)
 ### Experiments (`experiments/`):
 - `demo_5k_bins.py` - Standard demonstrations (5k bins)
 - `demo_spacing_comparison.py` - Compare spacing strategies
-- `test_self_conv_progressive.py` - Progressive scaling tests
-- `visualize_self_conv_results.py` - Visualization scripts
+- `demo_method_comparison.py` - Compare alternative implementations
+- `verify_comparison_methods.py` - Verify comparison methods work
 - All updated to use new API ✅
 
 ### Documentation (`docs/` and root):
