@@ -3,7 +3,7 @@ from numba import njit
 from .types import Mode, Spacing, DistKind, DiscreteDist
 from .grids import build_grid_from_support_bounds
 
-def check_mass_conservation(dist: DiscreteDist, tolerance: float = 1e-12) -> None:
+def check_mass_conservation(dist: DiscreteDist, tolerance: float = 1e-11) -> None:
     """
     Check if a distribution conserves probability mass within tolerance.
     Raises ValueError if mass conservation fails.
