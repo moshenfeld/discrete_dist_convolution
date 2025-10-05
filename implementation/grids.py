@@ -1,39 +1,8 @@
 
-from typing import Sequence, Tuple, Optional, Literal, Protocol, Union, Callable
+from typing import Tuple
 import numpy as np
 from scipy import stats
 from .types import Mode, Spacing
-
-def _strict_f64(x: np.ndarray) -> np.ndarray:
-    x = np.ascontiguousarray(x, dtype=np.float64)
-    if x.ndim != 1:
-        x = x.ravel()
-    return x
-
-
-def right_quantile_from_cdf_grid(x: np.ndarray, F: np.ndarray, q: float) -> float:
-    x = _strict_f64(x); F = _strict_f64(F)
-    if x.size == 0:
-        return float("nan")
-    lo = float(F[0]); hi = float(F[-1])
-    q = float(np.clip(q, lo, hi))
-    idx = int(np.searchsorted(F, q, side="left"))
-    if idx >= x.size:
-        idx = x.size - 1
-    return float(x[idx])
-
-def _cdf_array_from_dist_like(kind: str, x: np.ndarray, vals: np.ndarray, p_neg: float, p_pos: float) -> np.ndarray:
-    x = _strict_f64(x); vals = _strict_f64(vals)
-    if kind == "cdf":
-        F = vals.copy()
-    elif kind == "pmf":
-        F = float(p_neg) + np.cumsum(vals, dtype=np.float64)
-        np.minimum(F, 1.0 - float(p_pos), out=F)
-    elif kind == "ccdf":
-        F = 1.0 - vals
-    else:
-        raise ValueError(f"Unknown kind: {kind}")
-    return np.ascontiguousarray(F, dtype=np.float64)
 
 
 def build_grid_from_support_bounds(dist_1, dist_2, spacing, beta):
@@ -61,10 +30,10 @@ def build_grid_from_support_bounds(dist_1, dist_2, spacing, beta):
     t : np.ndarray
         Output grid for convolution result
     """
-    x1 = _strict_f64(dist_1.x)
-    x2 = _strict_f64(dist_2.x)
-    p1 = _strict_f64(dist_1.vals)
-    p2 = _strict_f64(dist_2.vals)
+    x1 = dist_1.x
+    x2 = dist_2.x
+    p1 = dist_1.vals
+    p2 = dist_2.vals
     
     # Determine output grid size (same as inputs, take max if they differ)
     out_size = max(x1.size, x2.size)

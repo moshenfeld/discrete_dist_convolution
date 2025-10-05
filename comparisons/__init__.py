@@ -10,7 +10,8 @@ with the main implementation:
 """
 
 from .fft_convolution import (
-    fft_self_convolve_pmf
+    fft_self_convolve_pmf,
+    fft_self_convolve_continuous
 )
 
 from .monte_carlo_convolution import (
@@ -28,6 +29,7 @@ from .analytic_convolution import (
 __all__ = [
     # FFT methods
     'fft_self_convolve_pmf',
+    'fft_self_convolve_continuous',
     
     # Monte Carlo methods
     'monte_carlo_self_convolve_pmf',

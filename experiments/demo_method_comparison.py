@@ -24,7 +24,7 @@ from implementation.grids import discretize_continuous_to_pmf
 
 # Import comparison methods
 from comparisons import (
-    fft_self_convolve_pmf,
+    fft_self_convolve_continuous,
     monte_carlo_self_convolve_pmf,
     analytic_convolve_gaussian,
     analytic_convolve_lognormal
@@ -42,6 +42,7 @@ from visualization.method_comparison_plots import plot_gaussian_results, plot_lo
 
 # Standard parameters
 N_BINS = 20000
+FFT_SIZE = 5000
 BETA = 1e-15
 T_VALUES = [10, 100, 1000]  # Reduced for investigation
 MC_SAMPLES = 1_000_000  # Monte Carlo samples
@@ -92,11 +93,6 @@ def run_gaussian_comparison(T_values):
     for T in T_values:
         print(f"\n  T={T} copies...")
         
-        # Warmup on first run
-        if T == T_values[0]:
-            _ = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.LINEAR)
-            print(f"    [JIT warmup complete]")
-        
         # Method 1: Main implementation (upper/lower bounds)
         start = time.perf_counter()
         Z_upper = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.LINEAR)
@@ -105,7 +101,7 @@ def run_gaussian_comparison(T_values):
         
         # Method 2: FFT convolution
         start = time.perf_counter()
-        Z_fft = fft_self_convolve_pmf(dist_gaussian, T, Mode.DOMINATES, Spacing.LINEAR, N_BINS, BETA)
+        Z_fft = fft_self_convolve_continuous(dist_gaussian, T, Mode.DOMINATES, Spacing.LINEAR, FFT_SIZE, BETA)
         fft_time = time.perf_counter() - start
         
         # Method 3: Monte Carlo convolution
@@ -208,11 +204,6 @@ def run_lognormal_comparison(T_values):
     for T in T_values:
         print(f"\n  T={T} copies...")
         
-        # Warmup on first run
-        if T == T_values[0]:
-            _ = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.GEOMETRIC)
-            print(f"    [JIT warmup complete]")
-        
         # Method 1: Main implementation (upper/lower bounds)
         start = time.perf_counter()
         Z_upper = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.GEOMETRIC)
@@ -221,7 +212,7 @@ def run_lognormal_comparison(T_values):
         
         # Method 2: FFT convolution
         start = time.perf_counter()
-        Z_fft = fft_self_convolve_pmf(dist_lognorm, T, Mode.DOMINATES, Spacing.LINEAR, N_BINS, BETA)
+        Z_fft = fft_self_convolve_continuous(dist_lognorm, T, Mode.DOMINATES, Spacing.LINEAR, FFT_SIZE, BETA)
         fft_time = time.perf_counter() - start
         
         # Method 3: Monte Carlo convolution

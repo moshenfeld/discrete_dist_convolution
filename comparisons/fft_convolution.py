@@ -7,7 +7,7 @@ time domain equals multiplication in the frequency domain.
 """
 
 import numpy as np
-from scipy import fft
+from scipy import fft, stats
 from typing import Optional
 import sys
 import os
@@ -15,6 +15,7 @@ import os
 # Add parent directory to path to import implementation modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from implementation.types import DiscreteDist, DistKind, Mode, Spacing
+from implementation.grids import discretize_continuous_to_pmf
 
 
 def fft_convolve_pmf_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode, spacing: Spacing) -> DiscreteDist:
@@ -205,6 +206,65 @@ def fft_self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode, spacing: Spaci
         p_pos_inf=p_pos_inf,
         name=f"FFT_selfconv_{T}({base.name or 'base'})"
     )
+
+
+def fft_self_convolve_continuous(dist: stats.rv_continuous, T: int, mode: Mode, spacing: Spacing, 
+                                n_bins: int, beta: float) -> DiscreteDist:
+    """
+    FFT-based self-convolution of a continuous distribution T times.
+    
+    This function discretizes the continuous distribution internally using linear spacing,
+    then applies FFT-based convolution.
+    
+    Parameters:
+    -----------
+    dist : scipy.stats.rv_continuous
+        Continuous distribution object
+    T : int
+        Number of times to convolve (must be >= 1)
+    mode : Mode
+        Tie-breaking mode (used for consistency)
+    spacing : Spacing
+        Grid spacing strategy (must be LINEAR for FFT)
+    n_bins : int
+        Number of bins for discretization
+    beta : float
+        Tail probability to trim during discretization
+        
+    Returns:
+    --------
+    DiscreteDist
+        T-fold self-convolution result
+    """
+    if T < 1:
+        raise ValueError(f"T must be >= 1, got {T}")
+    
+    if spacing != Spacing.LINEAR:
+        raise ValueError(f'FFT convolution only supports LINEAR spacing, got {spacing}')
+    
+    if T == 1:
+        # For T=1, just discretize and return
+        x, pmf, p_neg_inf, p_pos_inf = discretize_continuous_to_pmf(
+            dist, n_bins, beta, mode, spacing)
+        return DiscreteDist(
+            x=x, kind=DistKind.PMF, vals=pmf,
+            p_neg_inf=p_neg_inf, p_pos_inf=p_pos_inf,
+            name=f"FFT_discretized_{dist.__class__.__name__}"
+        )
+    
+    # Discretize the continuous distribution
+    x, pmf, p_neg_inf, p_pos_inf = discretize_continuous_to_pmf(
+        dist, n_bins, beta, mode, spacing)
+    
+    # Create DiscreteDist object
+    base = DiscreteDist(
+        x=x, kind=DistKind.PMF, vals=pmf,
+        p_neg_inf=p_neg_inf, p_pos_inf=p_pos_inf,
+        name=f"FFT_base_{dist.__class__.__name__}"
+    )
+    
+    # Apply FFT self-convolution
+    return fft_self_convolve_pmf(base, T, mode, spacing)
 
 
 def _is_linear_grid(x: np.ndarray, tol: float = 1e-10) -> bool:
