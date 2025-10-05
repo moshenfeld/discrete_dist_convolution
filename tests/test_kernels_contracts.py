@@ -4,7 +4,7 @@ from implementation.kernels import (
     convolve_pmf_cdf_to_cdf_core,
     convolve_pmf_ccdf_to_ccdf_core,
 )
-from discrete_conv_api import DiscreteDist, DistKind, convolve_pmf_pmf_to_pmf
+from discrete_conv_api import DiscreteDist, DistKind, Mode, convolve_pmf_pmf_to_pmf
 
 def test_pmf_cdf_core_ledger_only_until_implemented():
     # Minimal inputs where FY[-1]-pnegY = mY (finite mass); check ledger scalars.
@@ -16,7 +16,7 @@ def test_pmf_cdf_core_ledger_only_until_implemented():
                      vals=np.array([pnegY, 1.0 - pposY]),
                      p_neg_inf=pnegY, p_pos_inf=pposY)
     t = np.array([-1.0, 0.0, 1.0, 3.0])
-    F, add_neg, add_pos = convolve_pmf_cdf_to_cdf_core(X, Y, t, "DOMINATES")
+    F, add_neg, add_pos = convolve_pmf_cdf_to_cdf_core(X, Y, t, Mode.DOMINATES)
     # Expect non-negative scalars; values of F are zeros until kernel is implemented
     assert add_neg >= 0 and add_pos >= 0
     assert F.shape == t.shape

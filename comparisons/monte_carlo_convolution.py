@@ -1,14 +1,14 @@
 """
-Monte Carlo sampling convolution implementation for discrete distributions.
+Monte Carlo sampling convolution implementation for continuous distributions.
 
 This module provides a Monte Carlo-based convolution method that works by
-sampling from the underlying distributions and computing the sum of T elements.
+sampling from continuous distributions and computing the sum of T elements.
 The resulting samples are then used to construct an empirical distribution.
 """
 
 import numpy as np
 from scipy import stats
-from typing import Optional, Tuple
+from typing import Tuple
 import sys
 import os
 
@@ -17,118 +17,24 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from implementation.types import DiscreteDist, DistKind, Mode, Spacing
 
 
-def monte_carlo_convolve_pmf_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode, spacing: Spacing, 
-                                n_samples: int = 100000, n_bins: Optional[int] = None) -> DiscreteDist:
+def monte_carlo_self_convolve_pmf(base_dist: stats.rv_continuous, T: int, mode: Mode, spacing: Spacing,
+                                 n_samples: int, n_bins: int, block_size: int = 100000) -> DiscreteDist:
     """
-    Monte Carlo convolution of two PMF distributions.
+    Monte Carlo self-convolution of a continuous distribution T times.
     
-    This method samples from both distributions and computes the sum of samples
-    to approximate the convolution. The resulting samples are histogrammed to
-    create an empirical PMF.
+    This method samples T elements from the base continuous distribution and computes
+    their sum to approximate the T-fold self-convolution. Uses block-based processing
+    to handle large sample sizes efficiently.
+    
+    Memory usage: ~block_size * T * 8 bytes (for double precision)
+    - Default block_size=100k: ~0.8MB for T=100, ~8MB for T=1000
+    - For high-memory systems, use larger block_size (e.g., 500k-1M)
+    - For memory-constrained systems, use smaller block_size (e.g., 10k-50k)
     
     Parameters:
     -----------
-    X, Y : DiscreteDist
-        Input distributions (must be PMF kind)
-    mode : Mode
-        Tie-breaking mode (used for consistency with other methods)
-    spacing : Spacing
-        Grid spacing strategy (used to determine output grid)
-    n_samples : int
-        Number of Monte Carlo samples to generate
-    n_bins : int, optional
-        Number of bins for histogramming. If None, uses input grid size
-        
-    Returns:
-    --------
-    DiscreteDist
-        Convolution result as PMF
-    """
-    if X.kind != DistKind.PMF or Y.kind != DistKind.PMF:
-        raise ValueError(f'monte_carlo_convolve_pmf_pmf expects PMF inputs, got {X.kind}, {Y.kind}')
-    
-    if n_samples <= 0:
-        raise ValueError(f'n_samples must be positive, got {n_samples}')
-    
-    # Determine number of bins
-    if n_bins is None:
-        n_bins = max(X.x.size, Y.x.size)
-    
-    # Sample from X and Y distributions
-    X_samples = _sample_from_pmf(X, n_samples)
-    Y_samples = _sample_from_pmf(Y, n_samples)
-    
-    # Compute convolution samples (sum)
-    Z_samples = X_samples + Y_samples
-    
-    # Create histogram bins
-    z_min = Z_samples.min()
-    z_max = Z_samples.max()
-    
-    # Ensure we have a valid range
-    if z_max <= z_min:
-        z_max = z_min + 1e-10
-    
-    if spacing == Spacing.GEOMETRIC:
-        if z_min > 0:
-            bins = np.geomspace(z_min, z_max, n_bins + 1)
-        elif z_max < 0:
-            bins = -np.geomspace(-z_max, -z_min, n_bins + 1)[::-1]
-        else:
-            # Fall back to linear if range contains 0
-            bins = np.linspace(z_min, z_max, n_bins + 1)
-    else:  # LINEAR
-        bins = np.linspace(z_min, z_max, n_bins + 1)
-    
-    # Ensure bins are strictly increasing and unique
-    bins = np.sort(np.unique(bins))
-    
-    # Compute histogram
-    hist, bin_edges = np.histogram(Z_samples, bins=bins, density=False)
-    
-    # Convert to PMF (normalize by number of samples)
-    pmf = hist.astype(np.float64) / n_samples
-    
-    # Create grid points (bin centers)
-    x_grid = (bin_edges[:-1] + bin_edges[1:]) / 2
-    
-    # Ensure grid is strictly increasing and unique
-    x_grid = np.sort(np.unique(x_grid))
-    
-    # Ensure PMF matches grid size
-    if len(pmf) != len(x_grid):
-        # If sizes don't match, create a new PMF with correct size
-        pmf = np.zeros(len(x_grid))
-        for i in range(len(bin_edges) - 1):
-            if i < len(hist):
-                pmf[i] = hist[i] / n_samples
-    
-    # Handle infinity masses (approximate from tail samples)
-    p_neg_inf = np.sum(Z_samples < z_min) / n_samples
-    p_pos_inf = np.sum(Z_samples > z_max) / n_samples
-    
-    return DiscreteDist(
-        x=x_grid,
-        kind=DistKind.PMF,
-        vals=pmf,
-        p_neg_inf=p_neg_inf,
-        p_pos_inf=p_pos_inf,
-        name=f"MC_conv({X.name or 'X'}, {Y.name or 'Y'})"
-    )
-
-
-def monte_carlo_self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode, spacing: Spacing,
-                                 n_samples: int = 100000, n_bins: Optional[int] = None) -> DiscreteDist:
-    """
-    Monte Carlo self-convolution of a PMF distribution T times.
-    
-    This method samples T elements from the base distribution and computes
-    their sum to approximate the T-fold self-convolution.
-    
-    Parameters:
-    -----------
-    base : DiscreteDist
-        Base distribution (must be PMF)
+    base_dist : scipy.stats.rv_continuous
+        Base continuous distribution
     T : int
         Number of times to convolve (must be >= 1)
     mode : Mode
@@ -137,64 +43,85 @@ def monte_carlo_self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode, spacin
         Grid spacing strategy (used to determine output grid)
     n_samples : int
         Number of Monte Carlo samples to generate
-    n_bins : int, optional
-        Number of bins for histogramming. If None, uses input grid size
+    n_bins : int
+        Number of bins for histogramming
+    block_size : int
+        Size of blocks for memory-efficient sampling (default: 100000)
         
     Returns:
     --------
     DiscreteDist
         T-fold self-convolution result
     """
-    if base.kind != DistKind.PMF:
-        raise ValueError(f'monte_carlo_self_convolve_pmf expects PMF input, got {base.kind}')
-    
     if T < 1:
         raise ValueError(f"T must be >= 1, got {T}")
     
     if n_samples <= 0:
         raise ValueError(f'n_samples must be positive, got {n_samples}')
     
-    # Determine number of bins
-    if n_bins is None:
-        n_bins = base.x.size
+    if block_size <= 0:
+        raise ValueError(f'block_size must be positive, got {block_size}')
     
-    # Sample T elements from base distribution for each Monte Carlo sample
-    # Shape: (n_samples, T)
-    samples_matrix = _sample_from_pmf(base, n_samples * T).reshape(n_samples, T)
+    # Initialize histogram accumulator
+    hist_accumulator = None
+    bins = None
+    z_min = float('inf')
+    z_max = float('-inf')
     
-    # Compute sum of T elements for each Monte Carlo sample
-    Z_samples = np.sum(samples_matrix, axis=1)
+    # Process samples in blocks to avoid memory issues
+    n_blocks = (n_samples + block_size - 1) // block_size
     
-    # Create histogram bins
-    z_min = Z_samples.min()
-    z_max = Z_samples.max()
-    
-    # Ensure we have a valid range
-    if z_max <= z_min:
-        z_max = z_min + 1e-10
-    
-    if spacing == Spacing.GEOMETRIC:
-        if z_min > 0:
-            bins = np.geomspace(z_min, z_max, n_bins + 1)
-        elif z_max < 0:
-            bins = -np.geomspace(-z_max, -z_min, n_bins + 1)[::-1]
+    for block_idx in range(n_blocks):
+        # Calculate block boundaries
+        start_idx = block_idx * block_size
+        end_idx = min(start_idx + block_size, n_samples)
+        current_block_size = end_idx - start_idx
+        
+        # Sample T elements from base continuous distribution for current block
+        # Shape: (current_block_size, T) - vectorized sampling
+        samples_matrix = _sample_from_continuous(base_dist, current_block_size * T).reshape(current_block_size, T)
+        
+        # Compute sum of T elements for each Monte Carlo sample in this block
+        Z_block = np.sum(samples_matrix, axis=1)
+        
+        # Update global min/max
+        z_min = min(z_min, Z_block.min())
+        z_max = max(z_max, Z_block.max())
+        
+        # Create histogram bins on first iteration
+        if bins is None:
+            # Ensure we have a valid range
+            if z_max <= z_min:
+                z_max = z_min + 1e-10
+            
+            if spacing == Spacing.GEOMETRIC:
+                if z_min > 0:
+                    bins = np.geomspace(z_min, z_max, n_bins + 1)
+                elif z_max < 0:
+                    bins = -np.geomspace(-z_max, -z_min, n_bins + 1)[::-1]
+                else:
+                    # Fall back to linear if range contains 0
+                    bins = np.linspace(z_min, z_max, n_bins + 1)
+            else:  # LINEAR
+                bins = np.linspace(z_min, z_max, n_bins + 1)
+            
+            # Ensure bins are strictly increasing and unique
+            bins = np.sort(np.unique(bins))
+        
+        # Compute histogram for this block
+        hist_block, _ = np.histogram(Z_block, bins=bins, density=False)
+        
+        # Accumulate histogram
+        if hist_accumulator is None:
+            hist_accumulator = hist_block.astype(np.float64)
         else:
-            # Fall back to linear if range contains 0
-            bins = np.linspace(z_min, z_max, n_bins + 1)
-    else:  # LINEAR
-        bins = np.linspace(z_min, z_max, n_bins + 1)
+            hist_accumulator += hist_block.astype(np.float64)
     
-    # Ensure bins are strictly increasing and unique
-    bins = np.sort(np.unique(bins))
-    
-    # Compute histogram
-    hist, bin_edges = np.histogram(Z_samples, bins=bins, density=False)
-    
-    # Convert to PMF (normalize by number of samples)
-    pmf = hist.astype(np.float64) / n_samples
+    # Convert accumulated histogram to PMF (normalize by total number of samples)
+    pmf = hist_accumulator / n_samples
     
     # Create grid points (bin centers)
-    x_grid = (bin_edges[:-1] + bin_edges[1:]) / 2
+    x_grid = (bins[:-1] + bins[1:]) / 2
     
     # Ensure grid is strictly increasing and unique
     x_grid = np.sort(np.unique(x_grid))
@@ -203,13 +130,16 @@ def monte_carlo_self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode, spacin
     if len(pmf) != len(x_grid):
         # If sizes don't match, create a new PMF with correct size
         pmf = np.zeros(len(x_grid))
-        for i in range(len(bin_edges) - 1):
-            if i < len(hist):
-                pmf[i] = hist[i] / n_samples
+        for i in range(len(bins) - 1):
+            if i < len(hist_accumulator):
+                pmf[i] = hist_accumulator[i] / n_samples
     
     # Handle infinity masses (approximate from tail samples)
-    p_neg_inf = np.sum(Z_samples < z_min) / n_samples
-    p_pos_inf = np.sum(Z_samples > z_max) / n_samples
+    p_neg_inf = 0.0  # Will be updated after final sampling if needed
+    p_pos_inf = 0.0  # Will be updated after final sampling if needed
+    
+    # Determine name for continuous distribution
+    base_name = f"continuous_{base_dist.dist.name if hasattr(base_dist, 'dist') else 'dist'}"
     
     return DiscreteDist(
         x=x_grid,
@@ -217,18 +147,20 @@ def monte_carlo_self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode, spacin
         vals=pmf,
         p_neg_inf=p_neg_inf,
         p_pos_inf=p_pos_inf,
-        name=f"MC_selfconv_{T}({base.name or 'base'})"
+        name=f"MC_selfconv_{T}({base_name})"
     )
 
 
-def _sample_from_pmf(dist: DiscreteDist, n_samples: int) -> np.ndarray:
+
+
+def _sample_from_continuous(dist: stats.rv_continuous, n_samples: int) -> np.ndarray:
     """
-    Sample from a discrete PMF distribution.
+    Sample from a continuous distribution using vectorized operations.
     
     Parameters:
     -----------
-    dist : DiscreteDist
-        Discrete distribution (must be PMF)
+    dist : scipy.stats.rv_continuous
+        Continuous distribution object
     n_samples : int
         Number of samples to generate
         
@@ -237,130 +169,5 @@ def _sample_from_pmf(dist: DiscreteDist, n_samples: int) -> np.ndarray:
     np.ndarray
         Array of samples
     """
-    if dist.kind != DistKind.PMF:
-        raise ValueError(f'_sample_from_pmf expects PMF input, got {dist.kind}')
-    
-    # Create cumulative distribution for sampling
-    cumsum = np.cumsum(dist.vals)
-    
-    # Normalize to ensure it sums to 1 (accounting for infinity masses)
-    total_mass = cumsum[-1] + dist.p_neg_inf + dist.p_pos_inf
-    
-    # Generate uniform random numbers
-    u = np.random.random(n_samples)
-    
-    # Sample using inverse CDF method
-    samples = np.zeros(n_samples)
-    
-    for i, u_val in enumerate(u):
-        if u_val < dist.p_neg_inf / total_mass:
-            # Sample from negative infinity mass
-            samples[i] = -np.inf
-        elif u_val < (dist.p_neg_inf + cumsum[-1]) / total_mass:
-            # Sample from finite part
-            idx = np.searchsorted(cumsum, u_val * total_mass - dist.p_neg_inf)
-            samples[i] = dist.x[idx]
-        else:
-            # Sample from positive infinity mass
-            samples[i] = np.inf
-    
-    return samples
+    return dist.rvs(size=n_samples)
 
-
-def monte_carlo_convolve_with_continuous(X: DiscreteDist, continuous_dist: stats.rv_continuous, 
-                                       mode: Mode, spacing: Spacing, n_samples: int = 100000,
-                                       n_bins: Optional[int] = None) -> DiscreteDist:
-    """
-    Monte Carlo convolution of a discrete PMF with a continuous distribution.
-    
-    This method samples from both the discrete PMF and the continuous distribution
-    to approximate their convolution.
-    
-    Parameters:
-    -----------
-    X : DiscreteDist
-        Discrete distribution (must be PMF)
-    continuous_dist : scipy.stats.rv_continuous
-        Continuous distribution object
-    mode : Mode
-        Tie-breaking mode
-    spacing : Spacing
-        Grid spacing strategy
-    n_samples : int
-        Number of Monte Carlo samples
-    n_bins : int, optional
-        Number of bins for histogramming
-        
-    Returns:
-    --------
-    DiscreteDist
-        Convolution result
-    """
-    if X.kind != DistKind.PMF:
-        raise ValueError(f'monte_carlo_convolve_with_continuous expects PMF input, got {X.kind}')
-    
-    # Determine number of bins
-    if n_bins is None:
-        n_bins = X.x.size
-    
-    # Sample from discrete distribution
-    X_samples = _sample_from_pmf(X, n_samples)
-    
-    # Sample from continuous distribution
-    Y_samples = continuous_dist.rvs(size=n_samples)
-    
-    # Compute convolution samples
-    Z_samples = X_samples + Y_samples
-    
-    # Filter out infinite samples for histogramming
-    finite_mask = np.isfinite(Z_samples)
-    Z_finite = Z_samples[finite_mask]
-    
-    if len(Z_finite) == 0:
-        raise ValueError("All convolution samples are infinite")
-    
-    # Create histogram bins
-    z_min = Z_finite.min()
-    z_max = Z_finite.max()
-    
-    # Ensure we have a valid range
-    if z_max <= z_min:
-        z_max = z_min + 1e-10
-    
-    if spacing == Spacing.GEOMETRIC:
-        if z_min > 0:
-            bins = np.geomspace(z_min, z_max, n_bins + 1)
-        elif z_max < 0:
-            bins = -np.geomspace(-z_max, -z_min, n_bins + 1)[::-1]
-        else:
-            bins = np.linspace(z_min, z_max, n_bins + 1)
-    else:  # LINEAR
-        bins = np.linspace(z_min, z_max, n_bins + 1)
-    
-    # Ensure bins are strictly increasing
-    bins = np.sort(bins)
-    
-    # Compute histogram
-    hist, bin_edges = np.histogram(Z_finite, bins=bins, density=False)
-    
-    # Convert to PMF
-    pmf = hist.astype(np.float64) / n_samples
-    
-    # Create grid points
-    x_grid = (bin_edges[:-1] + bin_edges[1:]) / 2
-    
-    # Ensure grid is strictly increasing
-    x_grid = np.sort(x_grid)
-    
-    # Handle infinity masses
-    p_neg_inf = np.sum(Z_samples == -np.inf) / n_samples
-    p_pos_inf = np.sum(Z_samples == np.inf) / n_samples
-    
-    return DiscreteDist(
-        x=x_grid,
-        kind=DistKind.PMF,
-        vals=pmf,
-        p_neg_inf=p_neg_inf,
-        p_pos_inf=p_pos_inf,
-        name=f"MC_conv({X.name or 'X'}, continuous)"
-    )

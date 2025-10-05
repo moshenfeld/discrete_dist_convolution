@@ -2,12 +2,11 @@
 Comparison test between main implementation and alternative convolution methods.
 
 This script compares the main implementation (upper and lower bounds) with:
-1. FFT-based convolution (for Gaussian only, requires linear grids)
-2. Monte Carlo sampling convolution
-3. Analytic convolution (exact for Gaussian, approximate for lognormal)
+1. Monte Carlo sampling convolution
+2. Analytic convolution (exact for Gaussian, approximate for lognormal)
 
-For Gaussian: compares all 4 methods (main upper/lower + 3 alternatives)
-For Lognormal: compares 3 methods (main upper/lower + Monte Carlo + Analytic, no FFT)
+For Gaussian: compares all 3 methods (main upper/lower + Monte Carlo + Analytic)
+For Lognormal: compares 3 methods (main upper/lower + Monte Carlo + Analytic)
 """
 
 import sys
@@ -20,7 +19,8 @@ sys.path.insert(0, str(project_root))
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
-from discrete_conv_api import discretize_continuous_to_pmf, self_convolve_pmf, DiscreteDist, Mode, Spacing, DistKind
+from discrete_conv_api import self_convolve_pmf, DiscreteDist, Mode, Spacing, DistKind
+from implementation.grids import discretize_continuous_to_pmf
 
 # Import comparison methods
 from comparisons import (
@@ -41,10 +41,10 @@ from data_utils import save_results, load_latest_results, save_plot
 from visualization.method_comparison_plots import plot_gaussian_results, plot_lognormal_results
 
 # Standard parameters
-N_BINS = 5000
-BETA = 1e-12
-T_VALUES = [10, 100]  # Reduced for investigation
-MC_SAMPLES = 100000  # Monte Carlo samples
+N_BINS = 20000
+BETA = 1e-15
+T_VALUES = [10, 100, 1000]  # Reduced for investigation
+MC_SAMPLES = 1_000_000  # Monte Carlo samples
 
 # Control variables
 RERUN_TESTS = True  # Set to False to only run visualization from saved data
@@ -55,8 +55,7 @@ def run_gaussian_comparison(T_values):
     
     Compares:
     - Main implementation (upper/lower bounds)
-    - FFT convolution
-    - Monte Carlo convolution  
+    - Monte Carlo convolution
     - Analytic convolution (exact)
     """
     print(f"\n{'='*80}")
@@ -95,24 +94,24 @@ def run_gaussian_comparison(T_values):
         
         # Warmup on first run
         if T == T_values[0]:
-            _ = self_convolve_pmf(base_upper, T, mode='DOMINATES', spacing=Spacing.LINEAR)
+            _ = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.LINEAR)
             print(f"    [JIT warmup complete]")
         
         # Method 1: Main implementation (upper/lower bounds)
         start = time.perf_counter()
-        Z_upper = self_convolve_pmf(base_upper, T, mode='DOMINATES', spacing=Spacing.LINEAR)
-        Z_lower = self_convolve_pmf(base_lower, T, mode='IS_DOMINATED', spacing=Spacing.LINEAR)
+        Z_upper = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.LINEAR)
+        Z_lower = self_convolve_pmf(base_lower, T, mode=Mode.IS_DOMINATED, spacing=Spacing.LINEAR)
         main_time = time.perf_counter() - start
         
         # Method 2: FFT convolution
         start = time.perf_counter()
-        Z_fft = fft_self_convolve_pmf(base_upper, T, Mode.DOMINATES, Spacing.LINEAR)
+        Z_fft = fft_self_convolve_pmf(dist_gaussian, T, Mode.DOMINATES, Spacing.LINEAR, N_BINS, BETA)
         fft_time = time.perf_counter() - start
         
         # Method 3: Monte Carlo convolution
         start = time.perf_counter()
-        Z_mc = monte_carlo_self_convolve_pmf(base_upper, T, Mode.DOMINATES, Spacing.LINEAR, 
-                                            n_samples=MC_SAMPLES, n_bins=N_BINS)
+        Z_mc = monte_carlo_self_convolve_pmf(dist_gaussian, T, Mode.DOMINATES, Spacing.LINEAR, 
+                                            MC_SAMPLES, N_BINS)
         mc_time = time.perf_counter() - start
         
         # Method 4: Analytic convolution (exact for Gaussian)
@@ -211,22 +210,27 @@ def run_lognormal_comparison(T_values):
         
         # Warmup on first run
         if T == T_values[0]:
-            _ = self_convolve_pmf(base_upper, T, mode='DOMINATES', spacing=Spacing.GEOMETRIC)
+            _ = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.GEOMETRIC)
             print(f"    [JIT warmup complete]")
         
         # Method 1: Main implementation (upper/lower bounds)
         start = time.perf_counter()
-        Z_upper = self_convolve_pmf(base_upper, T, mode='DOMINATES', spacing=Spacing.GEOMETRIC)
-        Z_lower = self_convolve_pmf(base_lower, T, mode='IS_DOMINATED', spacing=Spacing.GEOMETRIC)
+        Z_upper = self_convolve_pmf(base_upper, T, mode=Mode.DOMINATES, spacing=Spacing.GEOMETRIC)
+        Z_lower = self_convolve_pmf(base_lower, T, mode=Mode.IS_DOMINATED, spacing=Spacing.GEOMETRIC)
         main_time = time.perf_counter() - start
         
-        # Method 2: Monte Carlo convolution
+        # Method 2: FFT convolution
         start = time.perf_counter()
-        Z_mc = monte_carlo_self_convolve_pmf(base_upper, T, Mode.DOMINATES, Spacing.GEOMETRIC,
-                                            n_samples=MC_SAMPLES, n_bins=N_BINS)
+        Z_fft = fft_self_convolve_pmf(dist_lognorm, T, Mode.DOMINATES, Spacing.LINEAR, N_BINS, BETA)
+        fft_time = time.perf_counter() - start
+        
+        # Method 3: Monte Carlo convolution
+        start = time.perf_counter()
+        Z_mc = monte_carlo_self_convolve_pmf(dist_lognorm, T, Mode.DOMINATES, Spacing.GEOMETRIC,
+                                            MC_SAMPLES, N_BINS)
         mc_time = time.perf_counter() - start
         
-        # Method 3: Analytic convolution (approximate for LogNormal)
+        # Method 4: Analytic convolution (approximate for LogNormal)
         start = time.perf_counter()
         Z_analytic = analytic_convolve_lognormal(dist_lognorm, T, Mode.DOMINATES, Spacing.GEOMETRIC,
                                                 n_points=N_BINS, beta=BETA)
@@ -237,6 +241,7 @@ def run_lognormal_comparison(T_values):
         
         E_upper = np.sum(Z_upper.x * Z_upper.vals)
         E_lower = np.sum(Z_lower.x * Z_lower.vals)
+        E_fft = np.sum(Z_fft.x * Z_fft.vals)
         
         # Handle Monte Carlo expectation calculation (filter out infinite values)
         finite_mask_mc = np.isfinite(Z_mc.x)
@@ -249,10 +254,11 @@ def run_lognormal_comparison(T_values):
         
         bias_main = E_upper - E_lower
         
-        print(f"    Times: Main={main_time:.3f}s, MC={mc_time:.3f}s, Analytic={analytic_time:.3f}s")
+        print(f"    Times: Main={main_time:.3f}s, FFT={fft_time:.3f}s, MC={mc_time:.3f}s, Analytic={analytic_time:.3f}s")
         print(f"    E[theoretical] = {E_theoretical:.6f}")
         print(f"    E[upper] = {E_upper:.6f}  (error: {E_upper - E_theoretical:+.6f})")
         print(f"    E[lower] = {E_lower:.6f}  (error: {E_lower - E_theoretical:+.6f})")
+        print(f"    E[FFT] = {E_fft:.6f}  (error: {E_fft - E_theoretical:+.6f})")
         print(f"    E[MC] = {E_mc:.6f}  (error: {E_mc - E_theoretical:+.6f})")
         print(f"    E[Analytic] = {E_analytic:.6f}  (error: {E_analytic - E_theoretical:+.6f})")
         print(f"    Bias (upper-lower) = {bias_main:.6f}")
@@ -260,15 +266,17 @@ def run_lognormal_comparison(T_values):
         results[T] = {
             'dist_upper': Z_upper,
             'dist_lower': Z_lower,
+            'dist_fft': Z_fft,
             'dist_mc': Z_mc,
             'dist_analytic': Z_analytic,
             'E_upper': E_upper,
             'E_lower': E_lower,
+            'E_fft': E_fft,
             'E_mc': E_mc,
             'E_analytic': E_analytic,
             'E_theoretical': E_theoretical,
             'bias_main': bias_main,
-            'times': {'main': main_time, 'mc': mc_time, 'analytic': analytic_time}
+            'times': {'main': main_time, 'fft': fft_time, 'mc': mc_time, 'analytic': analytic_time}
         }
     
     return results

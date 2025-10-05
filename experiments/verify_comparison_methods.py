@@ -13,7 +13,8 @@ from scipy import stats
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from discrete_conv_api import discretize_continuous_to_pmf, DiscreteDist, Mode, Spacing, DistKind
+from discrete_conv_api import DiscreteDist, Mode, Spacing, DistKind
+from implementation.grids import discretize_continuous_to_pmf
 from comparisons import (
     fft_self_convolve_pmf,
     monte_carlo_self_convolve_pmf,
@@ -37,7 +38,7 @@ def test_gaussian_methods():
     
     # Test FFT method
     try:
-        result_fft = fft_self_convolve_pmf(base, T, Mode.DOMINATES, Spacing.LINEAR)
+        result_fft = fft_self_convolve_pmf(dist_gaussian, T, Mode.DOMINATES, Spacing.LINEAR, 1000)
         print(f"  FFT: ✓ (shape: {result_fft.x.shape})")
     except Exception as e:
         print(f"  FFT: ✗ ({e})")

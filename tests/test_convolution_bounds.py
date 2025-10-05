@@ -13,13 +13,13 @@ import pytest
 import numpy as np
 from scipy import stats
 from discrete_conv_api import (
-    discretize_continuous_to_pmf, 
     self_convolve_pmf, 
     DiscreteDist, 
     Mode, 
     Spacing, 
     DistKind
 )
+from implementation.grids import discretize_continuous_to_pmf
 
 
 class TestDiscretization:
@@ -150,8 +150,8 @@ class TestSelfConvolution:
         dist = DiscreteDist(x=x, kind=DistKind.PMF, vals=pmf, p_neg_inf=0.0, p_pos_inf=0.0)
         
         # Test convolution with both modes
-        result_dom = self_convolve_pmf(dist, T=2, mode='DOMINATES', spacing=Spacing.LINEAR, beta=1e-12)
-        result_isd = self_convolve_pmf(dist, T=2, mode='IS_DOMINATED', spacing=Spacing.LINEAR, beta=1e-12)
+        result_dom = self_convolve_pmf(dist, T=2, mode=Mode.DOMINATES, spacing=Spacing.LINEAR, beta=1e-12)
+        result_isd = self_convolve_pmf(dist, T=2, mode=Mode.IS_DOMINATED, spacing=Spacing.LINEAR, beta=1e-12)
         
         # Check that results are different (or at least have different PMF values)
         grids_different = not np.allclose(result_dom.x, result_isd.x, rtol=1e-10)
@@ -185,8 +185,8 @@ class TestSelfConvolution:
                                p_neg_inf=pneg_isd, p_pos_inf=ppos_isd)
         
         # Test convolution
-        Z_dom = self_convolve_pmf(base_dom, T=T, mode='DOMINATES', spacing=Spacing.LINEAR, beta=BETA)
-        Z_isd = self_convolve_pmf(base_isd, T=T, mode='IS_DOMINATED', spacing=Spacing.LINEAR, beta=BETA)
+        Z_dom = self_convolve_pmf(base_dom, T=T, mode=Mode.DOMINATES, spacing=Spacing.LINEAR, beta=BETA)
+        Z_isd = self_convolve_pmf(base_isd, T=T, mode=Mode.IS_DOMINATED, spacing=Spacing.LINEAR, beta=BETA)
         
         # For T=10, the true distribution is N(0, sqrt(10))
         true_dist = stats.norm(0, np.sqrt(T))
@@ -253,8 +253,8 @@ class TestSelfConvolution:
                                p_neg_inf=pneg_isd, p_pos_inf=ppos_isd)
         
         # Test convolution
-        Z_dom = self_convolve_pmf(base_dom, T=T, mode='DOMINATES', spacing=Spacing.LINEAR, beta=BETA)
-        Z_isd = self_convolve_pmf(base_isd, T=T, mode='IS_DOMINATED', spacing=Spacing.LINEAR, beta=BETA)
+        Z_dom = self_convolve_pmf(base_dom, T=T, mode=Mode.DOMINATES, spacing=Spacing.LINEAR, beta=BETA)
+        Z_isd = self_convolve_pmf(base_isd, T=T, mode=Mode.IS_DOMINATED, spacing=Spacing.LINEAR, beta=BETA)
         
         # For T=5, the true distribution is lognormal(0, sqrt(5))
         true_dist = stats.lognorm(s=np.sqrt(T), scale=1)

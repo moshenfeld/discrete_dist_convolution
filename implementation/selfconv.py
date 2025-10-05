@@ -34,7 +34,7 @@ def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spac
     if T == 1:
         return base
     
-    beta /= T*np.log2(T) * 2
+    # beta /= T*np.log2(T) * 2
     # Binary exponentiation with evolving grids
     base_dist = base
     acc_dist = None

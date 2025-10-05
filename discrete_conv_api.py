@@ -8,9 +8,6 @@ from implementation import grids as _impl_grids
 from implementation import selfconv as _impl_selfconv
 from implementation.types import Mode, Spacing, DistKind, DiscreteDist
 
-# Export grid generation function and enums
-from implementation.grids import discretize_continuous_to_pmf, build_grid_from_support_bounds
-
 def cdf_to_pmf(x: np.ndarray, F: np.ndarray, p_neg_inf: float, p_pos_inf: float, *, tol: float = 1e-12) -> Tuple[np.ndarray, np.ndarray, float, float]:
     x = np.ascontiguousarray(x, dtype=np.float64)
     F = np.ascontiguousarray(F, dtype=np.float64)
@@ -31,7 +28,7 @@ def ccdf_to_pmf(x: np.ndarray, S: np.ndarray, p_neg_inf: float, p_pos_inf: float
             pmf[1:][pmf[1:] < 0.0] = 0.0
     return x, pmf, float(p_neg_inf), float(p_pos_inf)
 
-def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = 'DOMINATES', spacing: Spacing = Spacing.LINEAR, beta: float = 1e-12) -> DiscreteDist:
+def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = Mode.DOMINATES, spacing: Spacing = Spacing.LINEAR, beta: float = 1e-12) -> DiscreteDist:
     """
     Convolve two PMFs.
     
@@ -54,7 +51,7 @@ def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = 'DOMI
     Usage:
     ------
     # Automatic grid generation
-    Z = convolve_pmf_pmf_to_pmf(X, Y, mode='DOMINATES', spacing=Spacing.LINEAR, beta=1e-12)
+    Z = convolve_pmf_pmf_to_pmf(X, Y, mode=Mode.DOMINATES, spacing=Spacing.LINEAR, beta=1e-12)
     """
     if X.kind != DistKind.PMF or Y.kind != DistKind.PMF:
         raise ValueError('convolve_pmf_pmf_to_pmf expects PMF inputs')
@@ -64,7 +61,7 @@ def convolve_pmf_pmf_to_pmf(X: DiscreteDist, Y: DiscreteDist, mode: Mode = 'DOMI
     result.name = 'pmf⊕pmf'
     return result
 
-def convolve_pmf_cdf_to_cdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.ndarray] = None, mode: Mode = 'DOMINATES', spacing: Optional[Spacing] = None) -> DiscreteDist:
+def convolve_pmf_cdf_to_cdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.ndarray] = None, mode: Mode = Mode.DOMINATES, spacing: Optional[Spacing] = None) -> DiscreteDist:
     """
     Convolve PMF with CDF.
     
@@ -97,7 +94,7 @@ def convolve_pmf_cdf_to_cdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.nda
     F, pneg, ppos = _impl_kernels.convolve_pmf_cdf_to_cdf_core(X, Y, t, mode)
     return DiscreteDist(x=t, kind=DistKind.CDF, vals=F, p_neg_inf=pneg, p_pos_inf=ppos, name='pmf⊕cdf')
 
-def convolve_pmf_ccdf_to_ccdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.ndarray] = None, mode: Mode = 'DOMINATES', spacing: Optional[Spacing] = None) -> DiscreteDist:
+def convolve_pmf_ccdf_to_ccdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.ndarray] = None, mode: Mode = Mode.DOMINATES, spacing: Optional[Spacing] = None) -> DiscreteDist:
     """
     Convolve PMF with CCDF.
     
@@ -130,7 +127,7 @@ def convolve_pmf_ccdf_to_ccdf(X: DiscreteDist, Y: DiscreteDist, t: Optional[np.n
     S, pneg, ppos = _impl_kernels.convolve_pmf_ccdf_to_ccdf_core(X, Y, t, mode)
     return DiscreteDist(x=t, kind=DistKind.CCDF, vals=S, p_neg_inf=pneg, p_pos_inf=ppos, name='pmf⊕ccdf')
 
-def self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode = 'DOMINATES', spacing: Spacing = Spacing.LINEAR, beta: float = 1e-12) -> DiscreteDist:
+def self_convolve_pmf(base: DiscreteDist, T: int, mode: Mode = Mode.DOMINATES, spacing: Spacing = Spacing.LINEAR, beta: float = 1e-12) -> DiscreteDist:
     """
     Self-convolve a PMF T times: compute X + X + ... + X (T times).
     

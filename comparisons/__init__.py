@@ -10,15 +10,11 @@ with the main implementation:
 """
 
 from .fft_convolution import (
-    fft_convolve_pmf_pmf,
-    fft_self_convolve_pmf,
-    fft_convolve_with_adaptive_grid
+    fft_self_convolve_pmf
 )
 
 from .monte_carlo_convolution import (
-    monte_carlo_convolve_pmf_pmf,
-    monte_carlo_self_convolve_pmf,
-    monte_carlo_convolve_with_continuous
+    monte_carlo_self_convolve_pmf
 )
 
 from .analytic_convolution import (
@@ -31,14 +27,10 @@ from .analytic_convolution import (
 
 __all__ = [
     # FFT methods
-    'fft_convolve_pmf_pmf',
-    'fft_self_convolve_pmf', 
-    'fft_convolve_with_adaptive_grid',
+    'fft_self_convolve_pmf',
     
     # Monte Carlo methods
-    'monte_carlo_convolve_pmf_pmf',
     'monte_carlo_self_convolve_pmf',
-    'monte_carlo_convolve_with_continuous',
     
     # Analytic methods
     'analytic_convolve_gaussian',

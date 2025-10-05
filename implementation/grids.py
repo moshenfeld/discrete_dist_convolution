@@ -36,12 +36,12 @@ def _cdf_array_from_dist_like(kind: str, x: np.ndarray, vals: np.ndarray, p_neg:
     return np.ascontiguousarray(F, dtype=np.float64)
 
 
-def build_grid_from_support_bounds(dist_x, dist_y, spacing, beta):
+def build_grid_from_support_bounds(dist_1, dist_2, spacing, beta):
     """
     Build grid for convolution using support bounds based on probability mass thresholds.
     
-    Given two distributions dist_x, dist_y, spacing type, and beta:
-    1. Ensure dist_x size = dist_y size
+    Given two distributions dist_1, dist_2, spacing type, and beta:
+    1. Ensure dist_1 size = dist_2 size
     2. Compute x_min, x_max using beta (probability mass thresholds)
     3. Compute y_min, y_max using beta (probability mass thresholds)
     4. Compute z_min = x_min + y_min, z_max = x_max + y_max
@@ -49,7 +49,7 @@ def build_grid_from_support_bounds(dist_x, dist_y, spacing, beta):
     
     Parameters:
     -----------
-    dist_x, dist_y : DiscreteDist objects
+    dist_1, dist_2 : DiscreteDist objects
         Input distributions
     spacing : Spacing
         Spacing.LINEAR for linear spacing, Spacing.GEOMETRIC for geometric spacing
@@ -61,73 +61,50 @@ def build_grid_from_support_bounds(dist_x, dist_y, spacing, beta):
     t : np.ndarray
         Output grid for convolution result
     """
-    xX = _strict_f64(dist_x.x)
-    xY = _strict_f64(dist_y.x)
-    pX = _strict_f64(dist_x.vals)
-    pY = _strict_f64(dist_y.vals)
+    x1 = _strict_f64(dist_1.x)
+    x2 = _strict_f64(dist_2.x)
+    p1 = _strict_f64(dist_1.vals)
+    p2 = _strict_f64(dist_2.vals)
     
     # Determine output grid size (same as inputs, take max if they differ)
-    z_size = max(xX.size, xY.size)
-    if z_size < 2:
-        raise ValueError(f"Grid size must be >= 2, got {z_size}")
+    out_size = max(x1.size, x2.size)
+    if out_size < 2:
+        raise ValueError(f"Grid size must be >= 2, got {out_size}")
     
     # Compute probability mass threshold
-    threshold = np.sqrt(beta/2)
+    # threshold = np.sqrt(beta/2)
+    threshold = beta/2
     
     # Find x_min and x_max using beta
-    where_pX = np.where(np.cumsum(pX) <= threshold)[0]
-    iXmin = where_pX[-1] if len(where_pX) > 0 else 0
-    
-    where_pX_rev = np.where(np.cumsum(pX[::-1]) <= threshold)[0]
-    iXmax = np.size(pX) - 1 - (where_pX_rev[-1] if len(where_pX_rev) > 0 else 0)
-    
-    x_min = xX[iXmin]
-    x_max = xX[iXmax]
+    x1_min_ind_arr = np.where(np.cumsum(p1) <= threshold)[0]
+    x1_min_ind = x1_min_ind_arr[-1] if len(x1_min_ind_arr) > 0 else 0
+    x1_min = x1[x1_min_ind]
+
+    x1_max_ind_arr = np.where(np.cumsum(p1[::-1]) <= threshold)[0]
+    x1_max_ind = np.size(p1) - 1 - (x1_max_ind_arr[-1] if len(x1_max_ind_arr) > 0 else 0)
+    x1_max = x1[x1_max_ind]
     
     # Find y_min and y_max using beta
-    where_pY = np.where(np.cumsum(pY) <= threshold)[0]
-    iYmin = where_pY[-1] if len(where_pY) > 0 else 0
-    
-    where_pY_rev = np.where(np.cumsum(pY[::-1]) <= threshold)[0]
-    iYmax = np.size(pY) - 1 - (where_pY_rev[-1] if len(where_pY_rev) > 0 else 0)
-    
-    y_min = xY[iYmin]
-    y_max = xY[iYmax]
+    x2_min_ind_arr = np.where(np.cumsum(p2) <= threshold)[0]
+    x2_min_ind = x2_min_ind_arr[-1] if len(x2_min_ind_arr) > 0 else 0
+    x2_min = x2[x2_min_ind]
+
+    x2_max_ind_arr = np.where(np.cumsum(p2[::-1]) <= threshold)[0]
+    x2_max_ind = np.size(p2) - 1 - (x2_max_ind_arr[-1] if len(x2_max_ind_arr) > 0 else 0)
+    x2_max = x2[x2_max_ind]
     
     # Compute support bounds
-    z_min = x_min + y_min
-    z_max = x_max + y_max
+    x_out_min = x1_min + x2_min
+    x_out_max = x1_max + x2_max
     
-    if not np.isfinite(z_min) or not np.isfinite(z_max):
-        raise ValueError(f"Support bounds not finite: z_min={z_min}, z_max={z_max}")
+    if not np.isfinite(x_out_min) or not np.isfinite(x_out_max):
+        raise ValueError(f"Support bounds not finite: x_out_min={x_out_min}, x_out_max={x_out_max}")
     
-    if z_max <= z_min:
-        raise ValueError(f"Invalid support bounds: z_min={z_min} >= z_max={z_max}")
+    if x_out_max <= x_out_min:
+        raise ValueError(f"Invalid support bounds: x_out_min={x_out_min} >= x_out_max={x_out_max}")
     
     # Create grid based on spacing type
-    if spacing == Spacing.GEOMETRIC:
-        # Geometric spacing
-        if z_min > 0:
-            # Positive support: use geomspace directly
-            t = np.geomspace(z_min, z_max, z_size, dtype=np.float64)
-        elif z_max < 0:
-            # Negative support: geomspace on absolute values, then negate and reverse
-            t = -np.geomspace(-z_max, -z_min, z_size, dtype=np.float64)[::-1]
-        else:
-            # Support contains 0: cannot use geometric spacing
-            raise ValueError(
-                f"Cannot use geometric spacing when range [{z_min:.6f}, {z_max:.6f}] contains 0. "
-                f"Use spacing=Spacing.LINEAR instead."
-            )
-    else:
-        # Linear spacing
-        t = np.linspace(z_min, z_max, z_size, dtype=np.float64)
-    
-    # Add small perturbation to avoid exact collisions (except first point)
-    if t.size > 1:
-        t[1:] += np.linspace(1e-12, 1e-9, t.size-1)
-    
-    return np.ascontiguousarray(t, dtype=np.float64)
+    return _sample_from_range(x_out_min, x_out_max, out_size, spacing)
 
 def discretize_continuous_to_pmf(dist: stats.rv_continuous,
                                   n_grid: int,
@@ -173,32 +150,44 @@ def discretize_continuous_to_pmf(dist: stats.rv_continuous,
         raise ValueError(f"beta must be in (0, 1), got {beta}")
     
     # Step 1: Determine range via quantiles
-    q_min = dist.ppf(beta / 2)
-    q_max = dist.ppf(1 - beta / 2)
+    x_min = dist.ppf(beta / 2)
+    x_max = dist.ppf(1 - beta / 2)
     
-    if not np.isfinite(q_min) or not np.isfinite(q_max):
-        raise ValueError(f"Quantiles not finite: q_min={q_min}, q_max={q_max}")
+    if not np.isfinite(x_min) or not np.isfinite(x_max):
+        raise ValueError(f"Quantiles not finite: x_min={x_min}, x_max={x_max}")
     
     # Step 2: Create spacing based on spacing parameter
-    if spacing == Spacing.GEOMETRIC:
-        if q_min <= 0:
-            raise ValueError(f"Cannot use geometric spacing when range [{q_min:.6f}, {q_max:.6f}] contains negative values.")
-        else:
-            x = np.geomspace(q_min, q_max, n_grid, dtype=np.float64)
-    else:
-        x = np.linspace(q_min, q_max, n_grid, dtype=np.float64)
-        
+    x = _sample_from_range(x_min, x_max, n_grid, spacing)
+
     # Step 3: Discretize to PMF using CDF
+    # Use CDF to sample the first half of the grid and CCDF to sample the second half
+    x_center_ind = np.searchsorted(x, dist.ppf(0.5))
+    x_left = x[:x_center_ind+1]
+    x_right = x[x_center_ind:]
+    CDF_left = dist.cdf(x_left)
+    CCDF_right = dist.sf(x_right)
+    combined_PMF = np.concatenate([np.diff(CDF_left), -np.diff(CCDF_right)])
+    left = CDF_left[0]
+    right = CCDF_right[-1]
+    
     # Step 4: Assign tail masses to ±∞ based on mode
     if mode == Mode.DOMINATES:
-        F = dist.cdf(x)
-        pmf = np.concatenate(([F[0]], np.diff(F)))
+        pmf = np.concatenate(([left], combined_PMF))
         p_neg_inf = 0.0
-        p_pos_inf = dist.sf(x[-1])
+        p_pos_inf = right
     else:
-        F = dist.sf(x)
-        pmf = np.concatenate([-np.diff(F), [F[-1]]])
-        p_neg_inf = dist.cdf(x[0])
+        pmf = np.concatenate([combined_PMF, [right]])
+        p_neg_inf = left
         p_pos_inf = 0.0
         
     return x, pmf, float(p_neg_inf), float(p_pos_inf)
+
+def _sample_from_range(x_min: float, x_max: float, n_grid: int, spacing: Spacing) -> np.ndarray:
+    if spacing == Spacing.GEOMETRIC:
+        if x_min <= 0:
+            raise ValueError(f"Cannot use geometric spacing when range [{x_min:.6f}, {x_max:.6f}] contains negative values.")
+        else:
+            x = np.geomspace(x_min, x_max, n_grid, dtype=np.float64)
+    else:
+        x = np.linspace(x_min, x_max, n_grid, dtype=np.float64)
+    return x
