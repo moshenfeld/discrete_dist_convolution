@@ -1,6 +1,6 @@
 from typing import Literal
 import numpy as np
-from .kernels import convolve_pmf_pmf_to_pmf_core
+from .kernels import convolve_pmf_pmf_to_pmf_core, check_mass_conservation
 from .types import Mode, Spacing, DistKind, DiscreteDist
 
 def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spacing, beta: float) -> DiscreteDist:
@@ -34,7 +34,9 @@ def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spac
     if T == 1:
         return base
     
-    # beta /= T*np.log2(T) * 2
+    # Check mass conservation at the beginning
+    check_mass_conservation(base)
+    
     # Binary exponentiation with evolving grids
     base_dist = base
     acc_dist = None
@@ -49,5 +51,9 @@ def self_convolve_pmf_core(base: DiscreteDist, T: int, mode: Mode, spacing: Spac
         if T > 0:
             # Square base_dist - grid computed automatically inside kernel
             base_dist = convolve_pmf_pmf_to_pmf_core(base_dist, base_dist, mode, spacing, beta)
+    
+    # Check mass conservation at the end
+    check_mass_conservation(acc_dist)
+    
     return acc_dist
 

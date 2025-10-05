@@ -77,8 +77,8 @@ def test_pmf_pmf_with_infinity_masses():
     # The actual values may differ due to automatic grid generation
     # Just check that the total mass is conserved
     total_mass = result_dom.vals.sum() + result_dom.p_neg_inf + result_dom.p_pos_inf
-    # Expected total mass: finite parts (0.3*0.2) + infinity parts (0.7 + 0.8) = 0.06 + 1.5 = 1.56
-    assert np.isclose(total_mass, 1.56)
+    # Expected total mass: should be 1.0 (mass conservation)
+    assert np.isclose(total_mass, 1.0)
     assert result_dom.p_neg_inf >= 0.0
     assert result_dom.p_pos_inf >= 0.0
     
@@ -94,8 +94,8 @@ def test_pmf_pmf_with_infinity_masses():
     
     assert result_isd.kind == DistKind.PMF
     total_mass_isd = result_isd.vals.sum() + result_isd.p_neg_inf + result_isd.p_pos_inf
-    # Expected total mass: finite parts (0.3*0.2) + infinity parts (0.7 + 0.8) = 0.06 + 1.5 = 1.56
-    assert np.isclose(total_mass_isd, 1.56)
+    # Expected total mass: should be 1.0 (mass conservation)
+    assert np.isclose(total_mass_isd, 1.0)
     assert result_isd.p_neg_inf >= 0.0
     assert result_isd.p_pos_inf >= 0.0
 
